@@ -1,0 +1,7 @@
+example for dts:
+		
+		tas2555@4c {
+			compatible = "ti,tas2555";
+			reg = <0x4c>;
+			status = "okay";
+		};

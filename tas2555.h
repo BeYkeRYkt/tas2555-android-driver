@@ -340,6 +340,7 @@ struct tas2555_priv {
 	TFirmware *mpFirmware;
 	TFirmware *mpCalFirmware;
 	unsigned int mnCurrentProgram;
+	unsigned int mnCurrentSampleRate;
 	unsigned int mnCurrentConfiguration;
 	unsigned int mnCurrentCalibration;
 	int mnCurrentBook;

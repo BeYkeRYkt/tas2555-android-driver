@@ -96,9 +96,11 @@ static int tas2555_dev_read(struct tas2555_priv *pTAS2555,
 		nRegister &= ~0x80000000;
 	}
 
+/*	
 	dev_dbg(pTAS2555->dev, "%s: BOOK:PAGE:REG %u:%u:%u\n", __func__,
 		TAS2555_BOOK_ID(nRegister), TAS2555_PAGE_ID(nRegister),
 		TAS2555_PAGE_REG(nRegister));
+*/
 	tas2555_change_book_page(pTAS2555, TAS2555_BOOK_ID(nRegister),
 		TAS2555_PAGE_ID(nRegister));
 	ret = regmap_read(pTAS2555->mpRegmap, TAS2555_PAGE_REG(nRegister), pValue);
@@ -240,6 +242,8 @@ static int tas2555_i2c_probe(struct i2c_client *pClient,
 	unsigned int n;
 	int nResult;
 
+	dev_info(&pClient->dev, "%s enter\n", __FUNCTION__);
+	
 	pTAS2555 = devm_kzalloc(&pClient->dev, sizeof(struct tas2555_priv), GFP_KERNEL);
 	if (!pTAS2555)
 		return -ENOMEM;
@@ -308,9 +312,6 @@ static int tas2555_i2c_probe(struct i2c_client *pClient,
 
 	tas2555_load_default(pTAS2555);
 
-	nResult = request_firmware_nowait(THIS_MODULE, 1, TAS2555_FW_NAME,
-		&pClient->dev, GFP_KERNEL, pTAS2555, tas2555_fw_ready);
-
 	pTAS2555->mbTILoadActive = false;
 
 #ifdef CONFIG_TAS2555_CODEC	
@@ -327,6 +328,9 @@ static int tas2555_i2c_probe(struct i2c_client *pClient,
 	tiload_driver_init(pTAS2555);
 #endif
 
+	nResult = request_firmware_nowait(THIS_MODULE, 1, TAS2555_FW_NAME,
+		pTAS2555->dev, GFP_KERNEL, pTAS2555, tas2555_fw_ready);
+		
 	return nResult;
 }
 
@@ -358,11 +362,7 @@ MODULE_DEVICE_TABLE(i2c, tas2555_i2c_id);
 
 #if defined(CONFIG_OF)
 static const struct of_device_id tas2555_of_match[] = {
-#ifdef MTK_PLATFORM_DRIVER
-	{.compatible = "mediatek,EXT_SPEAKER_AMP"},
-#else
 	{.compatible = "ti,tas2555"},
-#endif
 	{},
 };
 

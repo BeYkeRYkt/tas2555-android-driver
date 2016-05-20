@@ -26,6 +26,8 @@
 #ifndef _TAS2555_CODEC_H
 #define _TAS2555_CODEC_H
 
+#include "tas2555.h"
+
 extern int tas2555_register_codec(struct tas2555_priv *pTAS2555);
 extern int tas2555_deregister_codec(struct tas2555_priv *pTAS2555);	
 

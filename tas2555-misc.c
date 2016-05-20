@@ -98,6 +98,11 @@ static int tas2555_file_open(struct inode *inode, struct file *file)
 
 static int tas2555_file_release(struct inode *inode, struct file *file)
 {
+	struct tas2555_priv *pTAS2555 = (struct tas2555_priv *)file->private_data;
+
+	if(g_logEnable) dev_info(pTAS2555->dev,
+				"%s\n", __FUNCTION__);
+				
 	file->private_data = (void*)NULL;
 	module_put(THIS_MODULE);
 
@@ -354,15 +359,6 @@ static ssize_t tas2555_file_read(struct file *file, char *buf, size_t count, lof
 			}
 		}
 		break;
-		
-		case TIAUDIO_CMD_FW_RELOAD:
-		{
-			if(count == 1){
-				tas2555_load_fs_firmware(pTAS2555, TAS2555_FW_FULL_NAME);
-			}
-				
-		}
-		break;
 	}
 	 pTAS2555->mnDBGCmd = 0;
 
@@ -541,6 +537,21 @@ static ssize_t tas2555_file_write(struct file *file, const char *buf, size_t cou
 					p_kBuf[1]);
 				tas2555_enable(pTAS2555, (p_kBuf[1]>0));
 			}
+		}
+		break;
+
+		case TIAUDIO_CMD_FW_RELOAD:
+		{
+			if(count == 1){
+				ret = request_firmware_nowait(THIS_MODULE, 1, TAS2555_FW_NAME,
+					pTAS2555->dev, GFP_KERNEL, pTAS2555, tas2555_fw_ready);
+					
+				if(g_logEnable) 
+					dev_info(pTAS2555->dev,
+						"TIAUDIO_CMD_FW_RELOAD: ret = %d\n", 
+						ret);					
+			}
+				
 		}
 		break;
 		

@@ -26,6 +26,8 @@
 #ifndef _TAS2555_CORE_H
 #define _TAS2555_CORE_H
 
+#include "tas2555.h"
+
 extern void tas2555_enable(struct tas2555_priv *pTAS2555, bool bEnable);
 extern int tas2555_set_sampling_rate(struct tas2555_priv *pTAS2555, 
 	unsigned int nSamplingRate);

@@ -42,6 +42,7 @@
 #include <asm/uaccess.h>
 
 #include "tas2555.h"
+#include "tas2555-core.h"
 
 #define TAS2555_CAL_NAME    "/data/tas2555_cal.bin"
 
@@ -230,7 +231,7 @@ int tas2555_set_sampling_rate(struct tas2555_priv *pTAS2555, unsigned int nSampl
 
 	pConfiguration = &(pTAS2555->mpFirmware->mpConfigurations[pTAS2555->mnCurrentConfiguration]);
 	if (pConfiguration->mnSamplingRate == nSamplingRate) {
-		dev_dbg(pTAS2555->dev, "Sampling rate for current configuration matches: %d\n",
+		dev_info(pTAS2555->dev, "Sampling rate for current configuration matches: %d\n",
 			nSamplingRate);
 		return 0;
 	}
@@ -240,8 +241,9 @@ int tas2555_set_sampling_rate(struct tas2555_priv *pTAS2555, unsigned int nSampl
 		nConfiguration++) {
 		pConfiguration =
 			&(pTAS2555->mpFirmware->mpConfigurations[nConfiguration]);
-		if (pConfiguration->mnSamplingRate == nSamplingRate) {
-			dev_dbg(pTAS2555->dev,
+		if ((pConfiguration->mnSamplingRate == nSamplingRate)
+			&&(pConfiguration->mnProgram == pTAS2555->mnCurrentProgram)){
+			dev_info(pTAS2555->dev,
 				"Found configuration: %s, with compatible sampling rate %d\n",
 				pConfiguration->mpName, nSamplingRate);
 			tas2555_load_configuration(pTAS2555, nConfiguration, false);
@@ -249,7 +251,7 @@ int tas2555_set_sampling_rate(struct tas2555_priv *pTAS2555, unsigned int nSampl
 		}
 	}
 
-	dev_dbg(pTAS2555->dev, "Cannot find a configuration that supports sampling rate: %d\n",
+	dev_err(pTAS2555->dev, "Cannot find a configuration that supports sampling rate: %d\n",
 		nSamplingRate);
 
 	return -EINVAL;
@@ -264,8 +266,6 @@ static void fw_print_header(struct tas2555_priv *pTAS2555, TFirmware * pFirmware
 	dev_info(pTAS2555->dev, "  Timestamp     = %d", pFirmware->mnTimeStamp);
 	dev_info(pTAS2555->dev, "  DDC Name      = %s", pFirmware->mpDDCName);
 	dev_info(pTAS2555->dev, "  Description   = %s", pFirmware->mpDescription);
-	dev_info(pTAS2555->dev, "  Device Family = %d", pFirmware->mnDeviceFamily);
-	dev_info(pTAS2555->dev, "  Device        = %d", pFirmware->mnDevice);
 }
 
 inline unsigned int fw_convert_number(unsigned char *pData)
@@ -575,20 +575,13 @@ static void tas2555_load_block(struct tas2555_priv *pTAS2555, TBlock * pBlock)
 
 		nCommand++;
 
-		if (nOffset <= 0x7F)
+		if (nOffset <= 0x7F){
 			pTAS2555->write(pTAS2555, TAS2555_REG(nBook, nPage, nOffset),
 				nData);
-		if (nOffset == 0x81) {
+		}else if (nOffset == 0x81) {
 			unsigned int nSleep = (nBook << 8) + nPage;
-			dev_dbg(pTAS2555->dev,
-				"TAS2555 load block: nOffset = 0x81 -> sleep %d [ms]\n",
-				nSleep);
 			msleep(nSleep);
-			dev_dbg(pTAS2555->dev,
-				"TAS2555 load block: just woke up from sleep %d [ms]\n",
-				nSleep);
-		}
-		if (nOffset == 0x85) {
+		}else if (nOffset == 0x85) {
 			pData += 4;
 			nLength = (nBook << 8) + nPage;
 			nBook = pData[0];
@@ -623,8 +616,6 @@ static void tas2555_load_data(struct tas2555_priv *pTAS2555, TData * pData,
 		if (pBlock->mnType == nType)
 			tas2555_load_block(pTAS2555, pBlock);
 	}
-
-	dev_dbg(pTAS2555->dev, "%s(), exit\n", __func__);
 }
 
 static void tas2555_load_configuration(struct tas2555_priv *pTAS2555,
@@ -649,7 +640,7 @@ static void tas2555_load_configuration(struct tas2555_priv *pTAS2555,
 	}
 
 	if ((nConfiguration == pTAS2555->mnCurrentConfiguration) && (!bLoadSame)) {
-		dev_dbg(pTAS2555->dev, "Configuration %d is already loaded\n",
+		dev_info(pTAS2555->dev, "Configuration %d is already loaded\n",
 			nConfiguration);
 		return;
 	}
@@ -659,13 +650,20 @@ static void tas2555_load_configuration(struct tas2555_priv *pTAS2555,
 	pNewConfiguration =
 		&(pTAS2555->mpFirmware->mpConfigurations[nConfiguration]);
 
+	if (pNewConfiguration->mnProgram != pCurrentConfiguration->mnProgram) {
+		dev_err(pTAS2555->dev,
+			"Configuration %d, %s doesn't share the same program as current %d\n",
+			nConfiguration, pNewConfiguration->mpName, pCurrentConfiguration->mnProgram);
+		return;
+	}
+
 	if (pNewConfiguration->mnPLL >= pTAS2555->mpFirmware->mnPLLs) {
 		dev_err(pTAS2555->dev,
 			"Configuration %d, %s doesn't have a valid PLL index %d\n",
 			nConfiguration, pNewConfiguration->mpName, pNewConfiguration->mnPLL);
 		return;
 	}
-
+	
 	pNewPLL = &(pTAS2555->mpFirmware->mpPLLs[pNewConfiguration->mnPLL]);
 
 	if (pTAS2555->mbPowerUp) {
@@ -683,6 +681,7 @@ static void tas2555_load_configuration(struct tas2555_priv *pTAS2555,
 			dev_dbg(pTAS2555->dev, "TAS2555: load new PLL: %s, block data\n",
 				pNewPLL->mpName);
 			tas2555_load_block(pTAS2555, &(pNewPLL->mBlock));
+			pTAS2555->mnCurrentSampleRate = pNewConfiguration->mnSamplingRate;
 			dev_dbg(pTAS2555->dev,
 				"load new configuration: %s, pre block data\n",
 				pNewConfiguration->mpName);
@@ -722,6 +721,7 @@ static void tas2555_load_configuration(struct tas2555_priv *pTAS2555,
 			dev_dbg(pTAS2555->dev, "TAS2555: load new PLL: %s, block data\n",
 				pNewPLL->mpName);
 			tas2555_load_block(pTAS2555, &(pNewPLL->mBlock));
+			pTAS2555->mnCurrentSampleRate = pNewConfiguration->mnSamplingRate;
 			dev_dbg(pTAS2555->dev,
 				"load new configuration: %s, pre block data\n",
 				pNewConfiguration->mpName);
@@ -765,9 +765,6 @@ int tas2555_set_config(struct tas2555_priv *pTAS2555, int config)
 	}
 
 	tas2555_load_configuration(pTAS2555, nConfiguration, false);
-
-	dev_dbg(pTAS2555->dev, "tas2555_configuration_put = %d\n",
-		pTAS2555->mnCurrentConfiguration);
 
 	return 0;
 }
@@ -860,104 +857,59 @@ static void tas2555_load_calibration(struct tas2555_priv *pTAS2555,
 		pTAS2555->mpCalFirmware->mnCalibrations);
 }
 
-void tas2555_fw_load(const struct firmware *pFW, struct tas2555_priv *pTAS2555)
+void tas2555_fw_ready(const struct firmware *pFW, void *pContext)
 {
-	TConfiguration *pConfiguration;
-	TPLL *pPLL;
+	struct tas2555_priv *pTAS2555 = (struct tas2555_priv *) pContext;
 	int nResult;
-	unsigned int Value;
+	unsigned int nProgram = 0;
+	unsigned int nSampleRate = 0;
 
 	dev_info(pTAS2555->dev, "%s:\n", __func__);
 
 	if (unlikely(!pFW) || unlikely(!pFW->data)) {
-		dev_info(pTAS2555->dev, "%s firmware is not loaded.\n",
+		dev_err(pTAS2555->dev, "%s firmware is not loaded.\n",
 			TAS2555_FW_NAME);
 		return;
 	}
 
-	tas2555_clear_firmware(pTAS2555->mpFirmware);
-	
+	if (pTAS2555->mpFirmware->mpConfigurations){
+		nProgram = pTAS2555->mnCurrentProgram;
+		nSampleRate = pTAS2555->mnCurrentSampleRate;
+		dev_dbg(pTAS2555->dev, "clear current firmware\n");
+		tas2555_clear_firmware(pTAS2555->mpFirmware);
+	}	
+		
 	nResult = fw_parse(pTAS2555, pTAS2555->mpFirmware, 
 		(unsigned char *) (pFW->data),	pFW->size);
-	
-	if (nResult) {
-		dev_err(pTAS2555->dev, "TAS2555 firmware is corrupt\n");
-		return;
-	}
-
-	dev_info(pTAS2555->dev, "TAS2555 firmware: %d programs\n",
-		pTAS2555->mpFirmware->mnPrograms);
-	dev_info(pTAS2555->dev, "TAS2555 firmware: %d configurations\n",
-		pTAS2555->mpFirmware->mnConfigurations);
-
-	if (!pTAS2555->mpFirmware->mnPrograms) {
-		dev_err(pTAS2555->dev, "TAS2555 firmware contains no programs\n");
-		return;
-	}
-
-	if (!pTAS2555->mpFirmware->mnConfigurations) {
-		dev_err(pTAS2555->dev, "TAS2555 firmware contains no configurations\n");
-		return;
-	}
-
-	tas2555_dev_load_data(pTAS2555, p_tas2555_mute_DSP_down_data);
-	pTAS2555->write(pTAS2555, TAS2555_SW_RESET_REG, 0x01);
-	udelay(1000);
-
-	pTAS2555->mnCurrentBook = 0;
-	pTAS2555->mnCurrentPage = 0;
-
-	pTAS2555->write(pTAS2555, TAS2555_CRC_RESET_REG, 0x01);
-	dev_info(pTAS2555->dev, "TAS2555 load base image: %s main block\n",
-		pTAS2555->mpFirmware->mpPrograms[0].mpName);
-	tas2555_load_data(pTAS2555, &(pTAS2555->mpFirmware->mpPrograms[0].mData),
-		TAS2555_BLOCK_BASE_MAIN);
-	pTAS2555->mbLoadConfigurationPostPowerUp = true;
-	pTAS2555->mnCurrentConfiguration = 0;
-	pTAS2555->mnCurrentProgram = 0;
-
-	pConfiguration = &(pTAS2555->mpFirmware->mpConfigurations[0]);
-	if (pConfiguration->mnPLL >= pTAS2555->mpFirmware->mnPLLs) {
-		dev_err(pTAS2555->dev,
-			"TAS2555 Configuration #0 doesn't have a valid PLL index #%d, max = %d\n",
-			pConfiguration->mnPLL, pTAS2555->mpFirmware->mnPLLs);
-		return;
-	} else {
-		pPLL = &(pTAS2555->mpFirmware->mpPLLs[pConfiguration->mnPLL]);
-		dev_info(pTAS2555->dev,
-			"TAS2555 load PLL: %s block for Configuration %s\n",
-			pPLL->mpName, pConfiguration->mpName);
-		tas2555_load_block(pTAS2555, &(pPLL->mBlock));
-	}
-
-	nResult = pTAS2555->read(pTAS2555, TAS2555_CRC_CHECKSUM_REG, &Value);
-	if (nResult < 0)
-		dev_err(pTAS2555->dev, "%d, ERROR!\n", __LINE__);
-	else
-		dev_info(pTAS2555->dev, "uCDSP Checksum: 0x%02x\n", Value);
-
-	nResult = pTAS2555->read(pTAS2555, TAS2555_PLL_CLKIN_REG, &Value);
-	dev_info(pTAS2555->dev, "TAS2555 PLL_CLKIN = 0x%02X\n", Value);
-	p_tas2555_startup_data[TAS2555_STARTUP_DATA_PLL_CLKIN_INDEX] = Value;
-
-	tas2555_load_data(pTAS2555, &(pConfiguration->mData),
-		TAS2555_BLOCK_CONF_PRE);
-}
-
-void tas2555_fw_ready(const struct firmware *pFW, void *pContext)
-{
-	struct tas2555_priv *pTAS2555 = (struct tas2555_priv *) pContext;
-
-	tas2555_fw_load(pFW, pTAS2555);
-	
-	if (unlikely(!pFW) || unlikely(!pFW->data)) {
-		dev_info(pTAS2555->dev, "%s firmware is not loaded.\n",
-			TAS2555_FW_NAME);
-		return;
-	}
 
 	release_firmware(pFW);
-}
+	
+	if (nResult) {
+		dev_err(pTAS2555->dev, "firmware is corrupt\n");
+		return;
+	}
+
+	if (!pTAS2555->mpFirmware->mnPrograms) {
+		dev_err(pTAS2555->dev, "firmware contains no programs\n");
+		return;
+	}
+	
+	if (!pTAS2555->mpFirmware->mnConfigurations) {
+		dev_err(pTAS2555->dev, 
+			"firmware contains no configurations\n");
+		return;
+	}
+	
+	if(nProgram >= pTAS2555->mpFirmware->mnPrograms){
+		dev_info(pTAS2555->dev, 
+			"no previous program, set to default\n");
+		nProgram = 0;
+	}
+		
+	pTAS2555->mnCurrentSampleRate = nSampleRate;
+
+	tas2555_set_program(pTAS2555, nProgram);
+}	
 
 int tas2555_set_program(struct tas2555_priv *pTAS2555,
 	unsigned int nProgram)
@@ -965,75 +917,103 @@ int tas2555_set_program(struct tas2555_priv *pTAS2555,
 	TPLL *pPLL;
 	TConfiguration *pConfiguration;
 	unsigned int nConfiguration = 0;
+	unsigned int nSampleRate = 0;
+	unsigned int Value = 0;
 	bool bFound = false;
+	int nResult = -1;
 
 	if ((!pTAS2555->mpFirmware->mpPrograms) ||
 		(!pTAS2555->mpFirmware->mpConfigurations)) {
 		dev_err(pTAS2555->dev, "Firmware not loaded\n");
 		return -1;
 	}
+	
 	if (nProgram >= pTAS2555->mpFirmware->mnPrograms) {
 		dev_err(pTAS2555->dev, "TAS2555: Program %d doesn't exist\n",
 			nConfiguration);
 		return -1;
 	}
 	
-	if(pTAS2555->mnCurrentProgram == nProgram){
-		dev_info(pTAS2555->dev, 
-			"Program %d, no need to set again\n",
-			nProgram);
-		return 0;
+	nConfiguration = 0;
+	nSampleRate = pTAS2555->mnCurrentSampleRate;
+	
+	while (!bFound 
+		&& (nConfiguration < pTAS2555->mpFirmware->mnConfigurations)) {
+		if (pTAS2555->mpFirmware->mpConfigurations[nConfiguration].mnProgram 
+			== nProgram){
+			if(nSampleRate == 0){
+				bFound = true;
+				dev_info(pTAS2555->dev, "find default configuration %d\n", nConfiguration);
+			}else if(nSampleRate 
+				== pTAS2555->mpFirmware->mpConfigurations[nConfiguration].mnSamplingRate){
+				bFound = true;
+				dev_info(pTAS2555->dev, "find matching configuration %d\n", nConfiguration);
+			}else{
+				nConfiguration++;
+			}
+		}else{
+			nConfiguration++;
+		}
 	}
-
+	
+	if (!bFound) {
+		dev_err(pTAS2555->dev, 
+			"Program %d, no valid configuration found for sample rate %d, ignore\n",
+			nProgram, nSampleRate);
+		return -1;
+	}
+	
 	pTAS2555->mnCurrentProgram = nProgram;
-
+	
+	tas2555_dev_load_data(pTAS2555, p_tas2555_mute_DSP_down_data);
 	pTAS2555->write(pTAS2555, TAS2555_SW_RESET_REG, 0x01);
 
 	udelay(1000);
 	pTAS2555->mnCurrentBook = 0;
 	pTAS2555->mnCurrentPage = 0;
-
+	
+	dev_info(pTAS2555->dev, "load program %d\n", nProgram);
 	tas2555_load_data(pTAS2555,
 		&(pTAS2555->mpFirmware->mpPrograms[nProgram].mData),
 		TAS2555_BLOCK_BASE_MAIN);
 
-	nConfiguration = 0;
-	while (!bFound && (nConfiguration < pTAS2555->mpFirmware->mnConfigurations)) {
-		if (pTAS2555->mpFirmware->mpConfigurations[nConfiguration].mnProgram ==
-			nProgram)
-			bFound = true;
-		else
-			nConfiguration++;
+	pTAS2555->mnCurrentConfiguration = nConfiguration;
+
+	pConfiguration =
+		&(pTAS2555->mpFirmware->mpConfigurations[nConfiguration]);
+	pPLL = &(pTAS2555->mpFirmware->mpPLLs[pConfiguration->mnPLL]);
+	dev_dbg(pTAS2555->dev,
+		"TAS2555 load PLL: %s block for Configuration %s\n",
+		pPLL->mpName, pConfiguration->mpName);
+	
+	tas2555_load_block(pTAS2555, &(pPLL->mBlock));
+	pTAS2555->mnCurrentSampleRate = pConfiguration->mnSamplingRate;
+	dev_dbg(pTAS2555->dev,
+		"load configuration %s conefficient pre block\n",
+		pConfiguration->mpName);		
+	tas2555_load_data(pTAS2555, &(pConfiguration->mData), TAS2555_BLOCK_CONF_PRE);
+
+	nResult = pTAS2555->read(pTAS2555, TAS2555_CRC_CHECKSUM_REG, &Value);
+	dev_info(pTAS2555->dev, "uCDSP Checksum: 0x%02x\n", Value);
+	nResult = pTAS2555->read(pTAS2555, TAS2555_PLL_CLKIN_REG, &Value);
+	dev_info(pTAS2555->dev, "TAS2555 PLL_CLKIN = 0x%02X\n", Value);
+	p_tas2555_startup_data[TAS2555_STARTUP_DATA_PLL_CLKIN_INDEX] = Value;
+
+	if (pTAS2555->mbPowerUp){
+		dev_dbg(pTAS2555->dev, "device powered up, load startup\n");
+		tas2555_dev_load_data(pTAS2555, p_tas2555_startup_data);
+		dev_dbg(pTAS2555->dev, 
+			"device powered up, load configuration %s post power block\n",
+			pConfiguration->mpName);
+		tas2555_load_data(pTAS2555, &(pConfiguration->mData),
+			TAS2555_BLOCK_CONF_POST_POWER);
 	}
-
-	if (bFound) {
-		pTAS2555->mnCurrentConfiguration = nConfiguration;
-
-		pConfiguration =
-			&(pTAS2555->mpFirmware->mpConfigurations[nConfiguration]);
-		pPLL = &(pTAS2555->mpFirmware->mpPLLs[pConfiguration->mnPLL]);
+	
+	tas2555_load_configuration(pTAS2555, nConfiguration, true);
+	if (pTAS2555->mbPowerUp){
 		dev_dbg(pTAS2555->dev,
-			"TAS2555 load PLL: %s block for Configuration %s\n",
-			pPLL->mpName, pConfiguration->mpName);
-		tas2555_load_block(pTAS2555, &(pPLL->mBlock));
-		tas2555_load_data(pTAS2555, &(pConfiguration->mData), TAS2555_BLOCK_CONF_PRE);
-
-		if (pTAS2555->mbPowerUp){
-			tas2555_dev_load_data(pTAS2555, p_tas2555_startup_data);
-			tas2555_load_data(pTAS2555, &(pConfiguration->mData),
-				TAS2555_BLOCK_CONF_POST_POWER);
-		}
-		tas2555_load_configuration(pTAS2555, nConfiguration, true);
-		if (pTAS2555->mbPowerUp)
-			tas2555_dev_load_data(pTAS2555, p_tas2555_unmute_data);
-
-		dev_dbg(pTAS2555->dev,
-			"tas2555_program_put = %d, found configuration = %d, %d\n",
-			pTAS2555->mnCurrentProgram, bFound, nConfiguration);
-	}else{
-		dev_err(pTAS2555->dev, 
-			"Program %d, no valid configuration found\n",
-			nProgram);
+			"device powered up, load unmute\n");
+		tas2555_dev_load_data(pTAS2555, p_tas2555_unmute_data);
 	}
 
 	return 0;
@@ -1044,19 +1024,20 @@ int tas2555_set_calibration(struct tas2555_priv *pTAS2555,
 {
 	if ((!pTAS2555->mpFirmware->mpPrograms) || (!pTAS2555->mpFirmware->mpConfigurations)) 
 	{
-		printk(KERN_ERR "TAS2555: Firmware not loaded\n\r");
+		dev_err(pTAS2555->dev, "Firmware not loaded\n\r");
 		return -1;
 	}
 
 	if (nCalibration == 0x00FF)
 	{
-		printk(KERN_ERR "TAS2555: load new calibration file %s\n\r", TAS2555_CAL_NAME); 	
+		dev_info(pTAS2555->dev, "load new calibration file %s\n", TAS2555_CAL_NAME); 	
 		tas2555_load_calibration(pTAS2555, TAS2555_CAL_NAME);
 		nCalibration = 0;
 	}
 
 	if (nCalibration >= pTAS2555->mpFirmware->mnCalibrations) {
-		printk(KERN_ERR "TAS2555: Calibration %d doesn't exist\n\r", nCalibration);
+		dev_err(pTAS2555->dev,
+			"Calibration %d doesn't exist\n", nCalibration);
 		return -1;
 	}
 
@@ -1065,64 +1046,6 @@ int tas2555_set_calibration(struct tas2555_priv *pTAS2555,
 		&(pTAS2555->mpCalFirmware->mpCalibrations[pTAS2555->mnCurrentCalibration].mBlock));
 
 	return 0;
-}
-
-void tas2555_load_fs_firmware(struct tas2555_priv *pTAS2555,
-	char *pFileName)
-{
-	int nFile;
-	mm_segment_t fs;
-	struct firmware fw;
-	unsigned char *p_kBuf;
-	int nSize = 0;
-	unsigned int count = 30000;
-
-	dev_dbg(pTAS2555->dev, "%s:\n", __func__);
-	p_kBuf = (unsigned char *)kzalloc(count, GFP_KERNEL);
-	if(p_kBuf == NULL){
-		dev_err(pTAS2555->dev, "not enough memory for %d bytes\n", count);
-		return;
-	}
-	
-	fs = get_fs();
-	set_fs(KERNEL_DS);
-	nFile = sys_open(pFileName, O_RDONLY, 0);
-
-	dev_info(pTAS2555->dev, "TAS2555 firmware file = %s, handle = %d\n",
-		pFileName, nFile);
-		
-	if (nFile >= 0) {
-		nSize = sys_read(nFile, p_kBuf, count);
-		sys_close(nFile);
-	} else {
-		dev_err(pTAS2555->dev, "TAS2555 cannot open firmware file: %s\n",
-			pFileName);
-	}
-
-	set_fs(fs);
-
-	if(nSize == count){
-		dev_err(pTAS2555->dev, 
-			"buffer length (%d) may not contain all the firmware\n",
-			count);
-	}
-	
-	if (!nSize){
-		dev_err(pTAS2555->dev, 
-			"firmware size error\n");
-	}else{
-		dev_info(pTAS2555->dev, "TAS2555 firmware size= %d\n",
-				nSize);		
-	
-		fw.size = nSize;
-		fw.data = p_kBuf;
-		tas2555_fw_load(&fw, pTAS2555);
-		
-		dev_info(pTAS2555->dev, "TAS2555 firmware: %d configurations\n",
-			pTAS2555->mpFirmware->mnConfigurations);		
-	}
-	
-	kfree(p_kBuf);		
 }
 
 MODULE_AUTHOR("Texas Instruments Inc.");

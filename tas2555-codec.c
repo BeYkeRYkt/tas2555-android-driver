@@ -48,10 +48,9 @@
 #include <sound/soc.h>
 #include <sound/initval.h>
 #include <sound/tlv.h>
-//#include <dt-bindings/sound/tas2555.h>
 
-#include "tas2555.h"
 #include "tas2555-core.h"
+#include "tas2555-codec.h"
 
 #undef KCONTROL_CODEC
 
@@ -205,7 +204,7 @@ static int tas2555_codec_probe(struct snd_soc_codec *pCodec)
 {
 	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(pCodec);
 
-	dev_dbg(pTAS2555->dev, "%s\n", __func__);
+	dev_info(pTAS2555->dev, "%s\n", __func__);
 
 	return 0;
 }
@@ -615,6 +614,9 @@ static struct snd_soc_dai_driver tas2555_dai_driver[] = {
 int tas2555_register_codec(struct tas2555_priv *pTAS2555)
 {
 	int nResult = 0;
+
+	dev_info(pTAS2555->dev, "%s, enter\n", __FUNCTION__);
+	  
 	nResult = snd_soc_register_codec(pTAS2555->dev, 
 		&soc_codec_driver_tas2555,
 		tas2555_dai_driver, ARRAY_SIZE(tas2555_dai_driver));

@@ -117,10 +117,12 @@ static unsigned int p_tas2555_unmute_data[] = {
 };
 
 static unsigned int p_tas2555_shutdown_data[] = {
+	TAS2555_SOFT_MUTE_REG, 0x01,	//soft mute
+	TAS2555_UDELAY, 10000,		//delay 10ms
 	TAS2555_MUTE_REG, 0x03,		//mute
 	TAS2555_PLL_CLKIN_REG, 0x0F,	//PLL clock input = osc
 	TAS2555_POWER_CTRL1_REG, 0x60,	//DSP power down
-	TAS2555_UDELAY, 0xFF,		//delay
+	TAS2555_UDELAY, 2000,		//delay 2ms
 	TAS2555_POWER_CTRL2_REG, 0x00,	//Class-D, Boost power down
 	TAS2555_POWER_CTRL1_REG, 0x00,	//all power down
 	0xFFFFFFFF, 0xFFFFFFFF

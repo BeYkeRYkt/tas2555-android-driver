@@ -116,7 +116,7 @@ static const struct snd_soc_dapm_route tas2555_audio_map[] = {
 	{"DAC", NULL, "NDivider"},
 };
 
-int tas2555_startup(struct snd_pcm_substream *substream,
+static int tas2555_startup(struct snd_pcm_substream *substream,
 	struct snd_soc_dai *dai)
 {
 	struct snd_soc_codec *codec = dai->codec;
@@ -127,13 +127,26 @@ int tas2555_startup(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-void tas2555_shutdown(struct snd_pcm_substream *substream,
+static void tas2555_shutdown(struct snd_pcm_substream *substream,
 	struct snd_soc_dai *dai)
 {
 	struct snd_soc_codec *codec = dai->codec;
 	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
 
 	dev_dbg(pTAS2555->dev, "%s\n", __func__);
+}
+
+static int tas2555_mute(struct snd_soc_dai *dai, int mute)
+{
+	struct snd_soc_codec *codec = dai->codec;
+	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
+	
+	dev_dbg(pTAS2555->dev, "%s\n", __func__);
+	mutex_lock(&pTAS2555->codec_lock);
+	tas2555_enable(pTAS2555, !mute);
+	mutex_unlock(&pTAS2555->codec_lock);
+	
+	return 0;
 }
 
 static int tas2555_set_dai_sysclk(struct snd_soc_dai *pDAI,
@@ -164,12 +177,22 @@ static int tas2555_hw_params(struct snd_pcm_substream *pSubstream,
 
 static int tas2555_set_dai_fmt(struct snd_soc_dai *pDAI, unsigned int nFormat)
 {
+	struct snd_soc_codec *codec = pDAI->codec;
+	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
+	
+	dev_dbg(pTAS2555->dev, "%s\n", __func__);
+	
 	return 0;
 }
 
 static int tas2555_prepare(struct snd_pcm_substream *pSubstream,
 	struct snd_soc_dai *pDAI)
 {
+	struct snd_soc_codec *codec = pDAI->codec;
+	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
+	
+	dev_dbg(pTAS2555->dev, "%s\n", __func__);
+	
 	return 0;
 }
 
@@ -178,25 +201,8 @@ static int tas2555_set_bias_level(struct snd_soc_codec *pCodec,
 {
 	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(pCodec);
 	
-	dev_dbg(pCodec->dev, "tas2555_set_bias_level: %d\n", eLevel);
-	mutex_lock(&pTAS2555->codec_lock);
-	switch (eLevel) {
-	case SND_SOC_BIAS_ON:
-		break;
-	case SND_SOC_BIAS_PREPARE:
-		break;
-	case SND_SOC_BIAS_STANDBY:
-		if (pCodec->dapm.bias_level == SND_SOC_BIAS_OFF)
-			tas2555_enable(pTAS2555, true);
-		break;
-	case SND_SOC_BIAS_OFF:
-		tas2555_enable(pTAS2555, false);
-		break;
-	}
-	
-	pCodec->dapm.bias_level = eLevel;
+	dev_dbg(pTAS2555->dev, "%s: %d\n", __func__, eLevel);
 
-	mutex_unlock(&pTAS2555->codec_lock);
 	return 0;
 }
 
@@ -561,6 +567,7 @@ static struct snd_soc_codec_driver soc_codec_driver_tas2555 = {
 static struct snd_soc_dai_ops tas2555_dai_ops = {
 	.startup = tas2555_startup,
 	.shutdown = tas2555_shutdown,
+	.digital_mute = tas2555_mute,
 	.hw_params = tas2555_hw_params,
 	.prepare = tas2555_prepare,
 	.set_sysclk = tas2555_set_dai_sysclk,

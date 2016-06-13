@@ -279,7 +279,8 @@ static int tas2555_i2c_probe(struct i2c_client *pClient,
 	pTAS2555->bulk_write = tas2555_dev_bulk_write;
 	pTAS2555->update_bits = tas2555_dev_update_bits;
 	pTAS2555->set_config = tas2555_set_config;
-	
+	pTAS2555->set_calibration = tas2555_set_calibration;
+		
 	mutex_init(&pTAS2555->dev_lock);
 	
 	/* Reset the chip */

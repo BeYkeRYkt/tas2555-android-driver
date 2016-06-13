@@ -331,6 +331,10 @@ static long tiload_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		num = copy_from_user(&val, argp, sizeof(val));
 		g_TAS2555->set_config(g_TAS2555, val);
 		break;
+	case TILOAD_IOCTL_SET_CALIBRATION:
+		num = copy_from_user(&val, argp, sizeof(val));
+		g_TAS2555->set_calibration(g_TAS2555, val);
+		break;				
 	default:
 		break;
 	}

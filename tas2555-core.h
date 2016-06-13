@@ -38,7 +38,7 @@ extern void tas2555_fw_ready(const struct firmware *pFW, void *pContext);
 extern int tas2555_set_program(struct tas2555_priv *pTAS2555,
 	unsigned int nProgram);
 extern int tas2555_set_calibration(struct tas2555_priv *pTAS2555,
-	unsigned int nCalibration);
+	int nCalibration);
 extern int tas2555_load_default(struct tas2555_priv *pTAS2555);
 	
 #endif /* _TAS2555_CORE_H */

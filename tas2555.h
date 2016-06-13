@@ -349,6 +349,7 @@ struct tas2555_priv {
 	int reset_gpio;
 	bool mbPowerUp;
 	bool mbLoadConfigurationPostPowerUp;
+	bool mbLoadCalibrationPostPowerUp;
 	unsigned int mnPowerCtrl;
 	bool mbCalibrationLoaded;
 	int (*read) (struct tas2555_priv * pTAS2555, unsigned int reg,
@@ -362,7 +363,7 @@ struct tas2555_priv {
 	int (*update_bits) (struct tas2555_priv * pTAS2555, unsigned int reg,
 		unsigned int mask, unsigned int value);
 	int (*set_config) (struct tas2555_priv *pTAS2555, int config);
-	
+	int (*set_calibration) (struct tas2555_priv *pTAS2555, int calibration);	
 #ifdef CONFIG_TAS2555_CODEC	
 	struct mutex codec_lock;
 #endif	

@@ -199,7 +199,18 @@ void tas2555_enable(struct tas2555_priv *pTAS2555, bool bEnable)
 					pTAS2555->mbLoadConfigurationPostPowerUp = false;
 					if (pTAS2555->mpCalFirmware->mnCalibrations) {
 						dev_dbg(pTAS2555->dev, "Enable: load calibration\n");
-						tas2555_load_block(pTAS2555, &(pTAS2555->mpCalFirmware->mpCalibrations[pTAS2555->mnCurrentCalibration].mBlock));
+						tas2555_load_block(pTAS2555, 
+							&(pTAS2555->mpCalFirmware->mpCalibrations[pTAS2555->mnCurrentCalibration].mBlock));
+						pTAS2555->mbLoadCalibrationPostPowerUp = false;
+					}
+				}else{
+					if (pTAS2555->mpCalFirmware->mnCalibrations) {
+						if(pTAS2555->mbLoadCalibrationPostPowerUp){
+							dev_dbg(pTAS2555->dev, "Enable: load calibration\n");
+							tas2555_load_block(pTAS2555, 
+								&(pTAS2555->mpCalFirmware->mpCalibrations[pTAS2555->mnCurrentCalibration].mBlock));
+							pTAS2555->mbLoadCalibrationPostPowerUp = false;
+						}
 					}
 				}
 			}
@@ -1022,7 +1033,7 @@ int tas2555_set_program(struct tas2555_priv *pTAS2555,
 }
 
 int tas2555_set_calibration(struct tas2555_priv *pTAS2555,
-	unsigned int nCalibration)
+	int nCalibration)
 {
 	if ((!pTAS2555->mpFirmware->mpPrograms) || (!pTAS2555->mpFirmware->mpConfigurations)) 
 	{
@@ -1044,8 +1055,13 @@ int tas2555_set_calibration(struct tas2555_priv *pTAS2555,
 	}
 
 	pTAS2555->mnCurrentCalibration = nCalibration;
-	tas2555_load_block(pTAS2555, 
-		&(pTAS2555->mpCalFirmware->mpCalibrations[pTAS2555->mnCurrentCalibration].mBlock));
+	if(pTAS2555->mbPowerUp){
+		tas2555_load_block(pTAS2555, 
+			&(pTAS2555->mpCalFirmware->mpCalibrations[pTAS2555->mnCurrentCalibration].mBlock));
+		pTAS2555->mbLoadCalibrationPostPowerUp = false; 
+	}else{
+		pTAS2555->mbLoadCalibrationPostPowerUp = true; 
+	}
 
 	return 0;
 }

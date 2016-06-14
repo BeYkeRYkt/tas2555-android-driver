@@ -721,6 +721,14 @@ static void tas2555_load_configuration(struct tas2555_priv *pTAS2555,
 			tas2555_load_data(pTAS2555, &(pNewConfiguration->mData),
 				TAS2555_BLOCK_CONF_COEFF);
 		}
+		
+		if (pTAS2555->mpCalFirmware->mnCalibrations) {
+				dev_dbg(pTAS2555->dev, "Enable: load calibration\n");
+				tas2555_load_block(pTAS2555, 
+					&(pTAS2555->mpCalFirmware->mpCalibrations[pTAS2555->mnCurrentCalibration].mBlock));
+				pTAS2555->mbLoadCalibrationPostPowerUp = false;
+		}
+		
 		pTAS2555->mbLoadConfigurationPostPowerUp = false;
 	} else {
 		dev_dbg(pTAS2555->dev,
@@ -741,6 +749,7 @@ static void tas2555_load_configuration(struct tas2555_priv *pTAS2555,
 			tas2555_load_data(pTAS2555, &(pNewConfiguration->mData),
 				TAS2555_BLOCK_CONF_PRE);
 		}
+		
 		pTAS2555->mbLoadConfigurationPostPowerUp = true;
 	}
 

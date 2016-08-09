@@ -44,6 +44,7 @@
 #include "tas2555.h"
 #include "tas2555-core.h"
 
+#define PPC_WITH_DRIVER_VERSION		0x010b8100
 #define TAS2555_CAL_NAME    "/data/tas2555_cal.bin"
 
 //set default PLL CLKIN to GPI2 (MCLK) = 0x00
@@ -272,13 +273,15 @@ int tas2555_set_sampling_rate(struct tas2555_priv *pTAS2555, unsigned int nSampl
 
 static void fw_print_header(struct tas2555_priv *pTAS2555, TFirmware * pFirmware)
 {
-	dev_info(pTAS2555->dev, "  FW Size       = %d", pFirmware->mnFWSize);
-	dev_info(pTAS2555->dev, "  Checksum      = 0x%04X", pFirmware->mnChecksum);
-	dev_info(pTAS2555->dev, "  PPC Version   = 0x%04X", pFirmware->mnPPCVersion);
-	dev_info(pTAS2555->dev, "  FW  Version   = 0x%04X", pFirmware->mnFWVersion);
-	dev_info(pTAS2555->dev, "  Timestamp     = %d", pFirmware->mnTimeStamp);
-	dev_info(pTAS2555->dev, "  DDC Name      = %s", pFirmware->mpDDCName);
-	dev_info(pTAS2555->dev, "  Description   = %s", pFirmware->mpDescription);
+	dev_info(pTAS2555->dev, "FW Size        = %d", pFirmware->mnFWSize);
+	dev_info(pTAS2555->dev, "Checksum       = 0x%04X", pFirmware->mnChecksum);
+	dev_info(pTAS2555->dev, "PPC Version    = 0x%04X", pFirmware->mnPPCVersion);
+	dev_info(pTAS2555->dev, "FW  Version    = 0x%04X", pFirmware->mnFWVersion);
+	if(pFirmware->mnPPCVersion >= PPC_WITH_DRIVER_VERSION)
+	dev_info(pTAS2555->dev, "Driver Version = 0x%04X", pFirmware->mnDriverVersion);
+	dev_info(pTAS2555->dev, "Timestamp      = %d", pFirmware->mnTimeStamp);
+	dev_info(pTAS2555->dev, "DDC Name       = %s", pFirmware->mpDDCName);
+	dev_info(pTAS2555->dev, "Description    = %s", pFirmware->mpDescription);
 }
 
 inline unsigned int fw_convert_number(unsigned char *pData)
@@ -317,6 +320,11 @@ static int fw_parse_header(struct tas2555_priv *pTAS2555,
 	pFirmware->mnFWVersion = fw_convert_number(pData);
 	pData += 4;
 
+	if(pFirmware->mnPPCVersion >= PPC_WITH_DRIVER_VERSION){
+		pFirmware->mnDriverVersion = fw_convert_number(pData);
+		pData += 4;		
+	}
+			
 	pFirmware->mnTimeStamp = fw_convert_number(pData);
 	pData += 4;
 

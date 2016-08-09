@@ -310,6 +310,7 @@ typedef struct {
 	unsigned int mnChecksum;
 	unsigned int mnPPCVersion;
 	unsigned int mnFWVersion;
+	unsigned int mnDriverVersion;
 	unsigned int mnTimeStamp;
 	char mpDDCName[64];
 	char *mpDescription;

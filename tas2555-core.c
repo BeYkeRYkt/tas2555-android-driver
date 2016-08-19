@@ -44,7 +44,7 @@
 #include "tas2555.h"
 #include "tas2555-core.h"
 
-#define PPC_WITH_DRIVER_VERSION		0x010b8100
+#define PPC_WITH_DRIVER_VERSION		0x010bc000
 #define TAS2555_CAL_NAME    "/data/tas2555_cal.bin"
 
 //set default PLL CLKIN to GPI2 (MCLK) = 0x00

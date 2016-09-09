@@ -52,7 +52,7 @@
 #include "tas2555-core.h"
 #include "tas2555-codec.h"
 
-#undef KCONTROL_CODEC
+#define KCONTROL_CODEC
 
 static struct tas2555_register register_addr = { 0 };
 

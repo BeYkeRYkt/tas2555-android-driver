@@ -165,6 +165,9 @@
 #define TAS2555_ISENSE_DIV_REG			TAS2555_REG(100, 0, 42)
 #define TAS2555_RAMP_CLK_DIV_MSB_REG		TAS2555_REG(100, 0, 43)
 #define TAS2555_RAMP_CLK_DIV_LSB_REG		TAS2555_REG(100, 0, 44)
+#define TAS2555_DIGITAL_GAIN_REG		TAS2555_REG(140, 42, 88)
+#define TAS2555_COEFFICENT_UPDATE_REG		TAS2555_REG(140, 25, 124)
+
 /* Bits */
 /* B0P0R4 - TAS2555_POWER_CTRL1_REG */
 #define TAS2555_SW_SHUTDOWN			(0x1 << 0)
@@ -261,6 +264,8 @@
 #define TAS2555_DSP_CLK_FROM_PLL		(0x1 << 5)
 
 #define TAS2555_FW_NAME     "tas2555_uCDSP.bin"
+
+#define ARRAY_LEN(x) ((int)(sizeof(x)/sizeof((x)[0])))
 
 typedef struct {
 	unsigned int mnType;

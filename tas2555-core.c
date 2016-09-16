@@ -144,6 +144,48 @@ static unsigned int p_tas2555_mute_DSP_down_data[] = {
 	0xFFFFFFFF, 0xFFFFFFFF
 };
 
+/*
+ *	<Gain reduction to be applied> = 
+	dec2hex(10^(gain reduction in dB/20) * 2^31-1)
+*/
+static unsigned int p_tas2555_digital_gain_data[] = {
+0x7FFFFFFF,        // 0	    dB
+0x721482BE,        // -1	dB
+0x65AC8C2E,        // -2	dB
+0x5A9DF7AA,        // -3	dB
+0x50C335D2,        // -4	dB
+0x47FACCEF,        // -5	dB
+0x4026E73B,        // -6	dB
+0x392CED8C,        // -7	dB
+0x32F52CFD,        // -8	dB
+0x2D6A866E,        // -9	dB
+0x287A26C3,        // -10	dB
+};
+
+
+static int tas2555_digital_gain(struct tas2555_priv *pTAS2555, int gain)
+{
+	int ret = -1;
+	int value = 0;
+	unsigned char Buf[4];
+	
+	if(gain < ARRAY_LEN(p_tas2555_digital_gain_data)){
+		value = p_tas2555_digital_gain_data[gain];
+		Buf[0] = (unsigned char)((value&0xff000000)>>24);
+		Buf[1] = (unsigned char)((value&0x00ff0000)>>16);
+		Buf[2] = (unsigned char)((value&0x0000ff00)>>8);
+		Buf[3] = (unsigned char)((value&0x000000ff));
+		
+		ret = pTAS2555->bulk_write(pTAS2555, 
+			TAS2555_DIGITAL_GAIN_REG,
+			Buf, 4);
+		ret = pTAS2555->write(pTAS2555, 
+			TAS2555_COEFFICENT_UPDATE_REG, 0x01);
+	}
+	
+	return ret;
+}
+
 static int tas2555_dev_load_data(struct tas2555_priv *pTAS2555,
 	unsigned int *pData)
 {

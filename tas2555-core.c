@@ -179,8 +179,13 @@ static int tas2555_digital_gain(struct tas2555_priv *pTAS2555, int gain)
 		ret = pTAS2555->bulk_write(pTAS2555, 
 			TAS2555_DIGITAL_GAIN_REG,
 			Buf, 4);
-		ret = pTAS2555->write(pTAS2555, 
-			TAS2555_COEFFICENT_UPDATE_REG, 0x01);
+			
+		Buf[0] = 0;
+		Buf[1] = 0;
+		Buf[2] = 0;
+		Buf[3] = 1;	
+		ret = pTAS2555->bulk_write(pTAS2555, 
+			TAS2555_COEFFICENT_UPDATE_REG, Buf, 4);
 	}
 	
 	return ret;

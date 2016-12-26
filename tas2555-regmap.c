@@ -58,8 +58,8 @@
 #include "tiload.h"
 #endif
 
-static void tas2555_change_book_page(struct tas2555_priv *pTAS2555, int nBook,
-	int nPage)
+static void tas2555_change_book_page(struct tas2555_priv *pTAS2555, unsigned char nBook,
+	unsigned char nPage)
 {
 	if ((pTAS2555->mnCurrentBook == nBook) 
 		&& pTAS2555->mnCurrentPage == nPage){

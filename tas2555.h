@@ -33,13 +33,13 @@
 #define TAS2555_BOOKCTL_PAGE			0
 #define TAS2555_BOOKCTL_REG			127
 
-#define TAS2555_REG(book, page, reg)		(((book * 256 * 128) + \
-						 (page * 128)) + reg)
+#define TAS2555_REG(book, page, reg)		((((unsigned int)book * 256 * 128) + \
+						 ((unsigned int)page * 128)) + reg)
 
-#define TAS2555_BOOK_ID(reg)			(reg / (256 * 128))
-#define TAS2555_PAGE_ID(reg)			((reg % (256 * 128)) / 128)
-#define TAS2555_BOOK_REG(reg)			(reg % (256 * 128))
-#define TAS2555_PAGE_REG(reg)			((reg % (256 * 128)) % 128)
+#define TAS2555_BOOK_ID(reg)			((unsigned char)(reg / (256 * 128)))
+#define TAS2555_PAGE_ID(reg)			((unsigned char)((reg % (256 * 128)) / 128))
+#define TAS2555_BOOK_REG(reg)			((unsigned char)(reg % (256 * 128)))
+#define TAS2555_PAGE_REG(reg)			((unsigned char)((reg % (256 * 128)) % 128))
 
 /* Book0, Page0 registers */
 #define TAS2555_SW_RESET_REG			TAS2555_REG(0, 0, 1)
@@ -349,8 +349,8 @@ struct tas2555_priv {
 	unsigned int mnCurrentSampleRate;
 	unsigned int mnCurrentConfiguration;
 	unsigned int mnCurrentCalibration;
-	int mnCurrentBook;
-	int mnCurrentPage;
+	unsigned char mnCurrentBook;
+	unsigned char mnCurrentPage;
 	bool mbTILoadActive;
 	int reset_gpio;
 	bool mbPowerUp;

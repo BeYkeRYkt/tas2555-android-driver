@@ -42,13 +42,15 @@ typedef struct {
 
 /* defines */
 #define DEVICE_NAME     "tiload_node"
+
 #define TILOAD_IOC_MAGIC   0xE0
 #define TILOAD_IOMAGICNUM_GET  			_IOR(TILOAD_IOC_MAGIC, 1, int)
 #define TILOAD_IOMAGICNUM_SET  			_IOW(TILOAD_IOC_MAGIC, 2, int)
 #define TILOAD_BPR_READ 				_IOR(TILOAD_IOC_MAGIC, 3, BPR)
 #define TILOAD_BPR_WRITE 				_IOW(TILOAD_IOC_MAGIC, 4, BPR)
-#define TILOAD_IOCTL_SET_CONFIG 		_IOW(TILOAD_IOC_MAGIC, 5, int)
-#define TILOAD_IOCTL_SET_CALIBRATION 	_IOW(TILOAD_IOC_MAGIC, 6, int)
+#define TILOAD_IOCTL_SET_CHL  			_IOW(TILOAD_IOC_MAGIC, 5, int)
+#define TILOAD_IOCTL_SET_CONFIG 		_IOW(TILOAD_IOC_MAGIC, 6, int)
+#define TILOAD_IOCTL_SET_CALIBRATION 	_IOW(TILOAD_IOC_MAGIC, 7, int)
 
 int tiload_driver_init(struct tas2555_priv *pTAS2555);
 

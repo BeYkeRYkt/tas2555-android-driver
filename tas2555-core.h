@@ -28,17 +28,37 @@
 
 #include "tas2555.h"
 
-extern void tas2555_enable(struct tas2555_priv *pTAS2555, bool bEnable);
-extern int tas2555_set_sampling_rate(struct tas2555_priv *pTAS2555, 
+#define TAS2555_YRAM_BOOK				140
+#define TAS2555_YRAM1_PAGE				42
+#define TAS2555_YRAM1_START_REG			88
+#define TAS2555_YRAM1_END_REG			127
+
+#define TAS2555_YRAM2_START_PAGE		43
+#define TAS2555_YRAM2_END_PAGE			52
+#define TAS2555_YRAM2_START_REG			8
+#define TAS2555_YRAM2_END_REG			127
+
+#define TAS2555_YRAM3_PAGE				53
+#define TAS2555_YRAM3_START_REG			8
+#define TAS2555_YRAM3_END_REG			35
+
+typedef struct {
+	unsigned char mnOffset;
+	unsigned char mnLen;
+} TYCRC;
+
+int tas2555_enable(struct tas2555_priv *pTAS2555, bool bEnable);
+int tas2555_set_sampling_rate(struct tas2555_priv *pTAS2555, 
 	unsigned int nSamplingRate);
-extern int tas2555_set_config(struct tas2555_priv *pTAS2555, int config);
-extern void tas2555_load_fs_firmware(struct tas2555_priv *pTAS2555,
+int tas2555_set_config(struct tas2555_priv *pTAS2555, int config);
+void tas2555_load_fs_firmware(struct tas2555_priv *pTAS2555,
 	char *pFileName);
-extern void tas2555_fw_ready(const struct firmware *pFW, void *pContext);
-extern int tas2555_set_program(struct tas2555_priv *pTAS2555,
+void tas2555_fw_ready(const struct firmware *pFW, void *pContext);
+int tas2555_set_program(struct tas2555_priv *pTAS2555,
 	unsigned int nProgram);
-extern int tas2555_set_calibration(struct tas2555_priv *pTAS2555,
+int tas2555_set_calibration(struct tas2555_priv *pTAS2555,
 	int nCalibration);
-extern int tas2555_load_default(struct tas2555_priv *pTAS2555);
-	
+int tas2555_load_default(struct tas2555_priv *pTAS2555);
+void tas2555_clear_firmware(TFirmware *pFirmware);
+
 #endif /* _TAS2555_CORE_H */

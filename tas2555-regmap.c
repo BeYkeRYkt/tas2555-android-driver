@@ -311,8 +311,6 @@ static int tas2555_i2c_probe(struct i2c_client *pClient,
 	nResult = tas2555_dev_read(pTAS2555, TAS2555_REV_PGID_REG, &n);
 	dev_info(&pClient->dev, "TAS2555 PGID: 0x%02x\n", n);
 
-	tas2555_load_default(pTAS2555);
-
 	pTAS2555->mbTILoadActive = false;
 
 #ifdef CONFIG_TAS2555_CODEC	

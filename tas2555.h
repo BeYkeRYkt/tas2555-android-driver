@@ -269,6 +269,10 @@
 
 typedef struct {
 	unsigned int mnType;
+	unsigned char mbPChkSumPresent;
+	unsigned char mnPChkSum;
+	unsigned char mbYChkSumPresent;
+	unsigned char mnYChkSum;		
 	unsigned int mnCommands;
 	unsigned char *mpData;
 } TBlock;
@@ -339,9 +343,7 @@ struct tas2555_register {
 
 struct tas2555_priv {
 	struct device *dev;
-#ifdef CONFIG_TAS2555_REGMAP	
 	struct regmap *mpRegmap;
-#endif	
 	struct mutex dev_lock;	
 	TFirmware *mpFirmware;
 	TFirmware *mpCalFirmware;

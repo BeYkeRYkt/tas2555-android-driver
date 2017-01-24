@@ -40,7 +40,7 @@
 
 #define TAS2555_YRAM3_PAGE				53
 #define TAS2555_YRAM3_START_REG			8
-#define TAS2555_YRAM3_END_REG			35
+#define TAS2555_YRAM3_END_REG			55
 
 typedef struct {
 	unsigned char mnOffset;

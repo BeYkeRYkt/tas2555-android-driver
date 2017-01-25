@@ -197,6 +197,47 @@ static int tas2555_digital_gain(struct tas2555_priv *pTAS2555, int gain)
 }
 #endif
 
+#define Q_FACTOR 0x08000000
+
+int tas2555_get_Re(struct tas2555_priv *pTAS2555, unsigned int *pRe)
+{
+	int ret = -1;
+	unsigned int nRe = 0, nValue;
+	unsigned char Buf[4];
+
+	if (pTAS2555->mbPowerUp) {
+		ret = pTAS2555->bulk_read(pTAS2555, TAS2555_COEFFICENT_RE_REG, Buf, 4);
+		if (ret < 0) {
+			dev_err(pTAS2555->dev, "I2C error\n");
+			goto err;
+		}
+
+		nRe = ((unsigned int)Buf[0] << 24) | ((unsigned int)Buf[1] << 16) 
+				| ((unsigned int)Buf[2] << 8) | Buf[3];
+
+		ret = pTAS2555->read(pTAS2555, TAS2555_CHANNEL_CTRL_REG, &nValue);
+		if (ret < 0) {
+			dev_err(pTAS2555->dev, "I2C error\n");
+			goto err;
+		}
+
+		nValue = (nValue & 0x06) >> 1;
+		if (nValue == 3)
+			dev_err(pTAS2555->dev, "speaker load config error \n");
+		else if (nValue == 2)
+			nRe /= 2;	/* 4 Ohm speaker load */
+		else if (nValue == 1)
+			nRe = (nRe / 4) * 3;	/* 6 Ohm speaker load */
+		/* else 8 Ohm speaker load */
+
+		*pRe = nRe; 
+	}
+
+err:
+
+	return ret;
+}
+
 static int tas2555_dev_load_data(struct tas2555_priv *pTAS2555,
 	unsigned int *pData)
 {

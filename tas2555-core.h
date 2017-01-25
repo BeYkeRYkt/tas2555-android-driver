@@ -58,6 +58,7 @@ int tas2555_set_program(struct tas2555_priv *pTAS2555,
 	unsigned int nProgram);
 int tas2555_set_calibration(struct tas2555_priv *pTAS2555,
 	int nCalibration);
+int tas2555_get_Re(struct tas2555_priv *pTAS2555, unsigned int *pRe);
 int tas2555_load_default(struct tas2555_priv *pTAS2555);
 void tas2555_clear_firmware(TFirmware *pFirmware);
 

@@ -395,6 +395,34 @@ static int tas2555_fs_get(struct snd_kcontrol *pKcontrol,
 	return 0;
 }
 
+static int tas2555_nRe_get(struct snd_kcontrol *pKcontrol,
+	struct snd_ctl_elem_value *pValue)
+{
+#ifdef KCONTROL_CODEC
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
+#else
+	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
+#endif
+	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
+	unsigned int nRe;
+	int ret;
+
+	mutex_lock(&pTAS2555->codec_lock);
+
+	if ((pTAS2555->mpFirmware->mnConfigurations > 0) && pTAS2555->mbPowerUp) {
+		ret = tas2555_get_Re(pTAS2555, &nRe);
+		if (ret >= 0)
+			pValue->value.integer.value[0] = nRe;
+		else
+			pValue->value.integer.value[0] = 0;
+	}
+
+	mutex_unlock(&pTAS2555->codec_lock);
+
+	dev_info(pTAS2555->dev, "tas2555_nRe_get = %d\n", nRe);
+	return 0;
+}
+
 static int tas2555_fs_put(struct snd_kcontrol *pKcontrol,
 	struct snd_ctl_elem_value *pValue)
 {
@@ -544,6 +572,8 @@ static const struct snd_kcontrol_new tas2555_snd_controls[] = {
 		tas2555_configuration_get, tas2555_configuration_put),
 	SOC_SINGLE_EXT("FS", SND_SOC_NOPM, 8000, 48000, 0,
 		tas2555_fs_get, tas2555_fs_put),
+	SOC_SINGLE_EXT("nRe", SND_SOC_NOPM, 0, 0x7fffffff, 0,
+		tas2555_nRe_get, NULL),
 	SOC_SINGLE_EXT("Calibration", SND_SOC_NOPM, 0, 0x00FF, 0,
 		tas2555_calibration_get, tas2555_calibration_put),
 };

@@ -26,6 +26,8 @@
 #ifndef _TAS2555_H
 #define _TAS2555_H
 
+#include <linux/switch.h>
+
 /* Page Control Register */
 #define TAS2555_PAGECTL_REG			0
 
@@ -346,7 +348,7 @@ struct tas2555_register {
 struct tas2555_priv {
 	struct device *dev;
 	struct regmap *mpRegmap;
-	struct mutex dev_lock;	
+	struct mutex dev_lock;
 	TFirmware *mpFirmware;
 	TFirmware *mpCalFirmware;
 	unsigned int mnCurrentProgram;
@@ -359,29 +361,38 @@ struct tas2555_priv {
 	int reset_gpio;
 	bool mbPowerUp;
 	bool mbLoadConfigurationPostPowerUp;
-	bool mbLoadCalibrationPostPowerUp;
+
 	unsigned int mnPowerCtrl;
+
+	/* to notify user critical condition */
+	struct switch_dev sw_dev;
+	unsigned int mnReHigh;
+	unsigned int mnReLow;
+
+	/* factory test and calibration */
+	bool mbLoadCalibrationPostPowerUp;
 	bool mbCalibrationLoaded;
-	int (*read) (struct tas2555_priv * pTAS2555, unsigned int reg,
+
+	int (*read)(struct tas2555_priv * pTAS2555, unsigned int reg,
 		unsigned int *pValue);
-	int (*write) (struct tas2555_priv * pTAS2555, unsigned int reg,
+	int (*write)(struct tas2555_priv * pTAS2555, unsigned int reg,
 		unsigned int Value);
-	int (*bulk_read) (struct tas2555_priv * pTAS2555, unsigned int reg,
+	int (*bulk_read)(struct tas2555_priv * pTAS2555, unsigned int reg,
 		unsigned char *pData, unsigned int len);
-	int (*bulk_write) (struct tas2555_priv * pTAS2555, unsigned int reg,
+	int (*bulk_write)(struct tas2555_priv * pTAS2555, unsigned int reg,
 		unsigned char *pData, unsigned int len);
-	int (*update_bits) (struct tas2555_priv * pTAS2555, unsigned int reg,
+	int (*update_bits)(struct tas2555_priv * pTAS2555, unsigned int reg,
 		unsigned int mask, unsigned int value);
-	int (*set_config) (struct tas2555_priv *pTAS2555, int config);
-	int (*set_calibration) (struct tas2555_priv *pTAS2555, int calibration);	
-#ifdef CONFIG_TAS2555_CODEC	
+	int (*set_config)(struct tas2555_priv *pTAS2555, int config);
+	int (*set_calibration)(struct tas2555_priv *pTAS2555, int calibration);
+#ifdef CONFIG_TAS2555_CODEC
 	struct mutex codec_lock;
 #endif	
-#ifdef CONFIG_TAS2555_MISC	
+#ifdef CONFIG_TAS2555_MISC
 	int mnDBGCmd;
-	int mnCurrentReg;	
+	int mnCurrentReg;
 	struct mutex file_lock;
-#endif	
+#endif
 };
 
 #endif /* _TAS2555_H */

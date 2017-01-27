@@ -313,6 +313,13 @@ static int tas2555_i2c_probe(struct i2c_client *pClient,
 
 	pTAS2555->mbTILoadActive = false;
 
+	pTAS2555->sw_dev.name = "TAS2555-failsafe";
+	nResult = switch_dev_register(&pTAS2555->sw_dev);
+	if (nResult < 0) {
+		dev_err(pTAS2555->dev, "fail to register switch device\n");
+		goto fail;
+	}
+
 #ifdef CONFIG_TAS2555_CODEC	
 	mutex_init(&pTAS2555->codec_lock);
 	tas2555_register_codec(pTAS2555);
@@ -329,16 +336,20 @@ static int tas2555_i2c_probe(struct i2c_client *pClient,
 
 	nResult = request_firmware_nowait(THIS_MODULE, 1, TAS2555_FW_NAME,
 		pTAS2555->dev, GFP_KERNEL, pTAS2555, tas2555_fw_ready);
-		
+
+fail:
+
 	return nResult;
 }
 
 static int tas2555_i2c_remove(struct i2c_client *pClient)
 {
 	struct tas2555_priv *pTAS2555 = i2c_get_clientdata(pClient);
-	
+
 	dev_info(pTAS2555->dev, "%s\n", __FUNCTION__);
-	
+
+	switch_dev_unregister(&pTAS2555->sw_dev);
+
 #ifdef CONFIG_TAS2555_CODEC		
 	tas2555_deregister_codec(pTAS2555);
 	mutex_destroy(&pTAS2555->codec_lock);

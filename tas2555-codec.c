@@ -389,9 +389,94 @@ static int tas2555_fs_get(struct snd_kcontrol *pKcontrol,
 	
 	pValue->value.integer.value[0] = nFS;
 	
-	mutex_unlock(&pTAS2555->codec_lock);	
+	mutex_unlock(&pTAS2555->codec_lock);
 	
-	dev_info(pTAS2555->dev, "tas2555_fs_get = %d\n", nFS);
+	dev_dbg(pTAS2555->dev, "tas2555_fs_get = %d\n", nFS);
+	return 0;
+}
+
+static int tas2555_fs_put(struct snd_kcontrol *pKcontrol,
+	struct snd_ctl_elem_value *pValue)
+{
+#ifdef KCONTROL_CODEC
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
+#else
+	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
+#endif
+	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
+	int ret = 0;
+	int nFS = pValue->value.integer.value[0];
+	
+	dev_info(pTAS2555->dev, "tas2555_fs_put = %d\n", nFS);
+	
+	mutex_lock(&pTAS2555->codec_lock);	
+	ret = tas2555_set_sampling_rate(pTAS2555, nFS);
+	
+	mutex_unlock(&pTAS2555->codec_lock);
+	return ret;
+}
+
+static int tas2555_nReHigh_get(struct snd_kcontrol *pKcontrol,
+	struct snd_ctl_elem_value *pValue)
+{
+#ifdef KCONTROL_CODEC
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
+#else
+	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
+#endif
+	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
+
+	pValue->value.integer.value[0] = pTAS2555->mnReHigh;
+
+	dev_dbg(pTAS2555->dev, "tas2555_nReHigh_get = %d\n", pTAS2555->mnReHigh);
+	return 0;
+}
+
+static int tas2555_nReHigh_put(struct snd_kcontrol *pKcontrol,
+	struct snd_ctl_elem_value *pValue)
+{
+#ifdef KCONTROL_CODEC
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
+#else
+	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
+#endif
+	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
+
+	pTAS2555->mnReHigh = pValue->value.integer.value[0];
+
+	dev_dbg(pTAS2555->dev, "tas2555_nReHigh_put = %d\n", pTAS2555->mnReHigh);
+	return 0;
+}
+
+static int tas2555_nReLow_get(struct snd_kcontrol *pKcontrol,
+	struct snd_ctl_elem_value *pValue)
+{
+#ifdef KCONTROL_CODEC
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
+#else
+	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
+#endif
+	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
+
+	pValue->value.integer.value[0] = pTAS2555->mnReLow;
+
+	dev_dbg(pTAS2555->dev, "tas2555_nReLow_get = %d\n", pTAS2555->mnReLow);
+	return 0;
+}
+
+static int tas2555_nReLow_put(struct snd_kcontrol *pKcontrol,
+	struct snd_ctl_elem_value *pValue)
+{
+#ifdef KCONTROL_CODEC
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
+#else
+	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
+#endif
+	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
+
+	pTAS2555->mnReLow = pValue->value.integer.value[0];
+
+	dev_dbg(pTAS2555->dev, "tas2555_nReLow_put = %d\n", pTAS2555->mnReLow);
 	return 0;
 }
 
@@ -419,29 +504,8 @@ static int tas2555_nRe_get(struct snd_kcontrol *pKcontrol,
 
 	mutex_unlock(&pTAS2555->codec_lock);
 
-	dev_info(pTAS2555->dev, "tas2555_nRe_get = %d\n", nRe);
+	dev_dbg(pTAS2555->dev, "tas2555_nRe_get = %d\n", nRe);
 	return 0;
-}
-
-static int tas2555_fs_put(struct snd_kcontrol *pKcontrol,
-	struct snd_ctl_elem_value *pValue)
-{
-#ifdef KCONTROL_CODEC
-	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
-#else
-	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
-#endif
-	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
-	int ret = 0;
-	int nFS = pValue->value.integer.value[0];
-	
-	dev_info(pTAS2555->dev, "tas2555_fs_put = %d\n", nFS);
-	
-	mutex_lock(&pTAS2555->codec_lock);	
-	ret = tas2555_set_sampling_rate(pTAS2555, nFS);
-	
-	mutex_unlock(&pTAS2555->codec_lock);	
-	return ret;
 }
 
 static int tas2555_program_get(struct snd_kcontrol *pKcontrol,
@@ -572,6 +636,10 @@ static const struct snd_kcontrol_new tas2555_snd_controls[] = {
 		tas2555_configuration_get, tas2555_configuration_put),
 	SOC_SINGLE_EXT("FS", SND_SOC_NOPM, 8000, 48000, 0,
 		tas2555_fs_get, tas2555_fs_put),
+	SOC_SINGLE_EXT("nReHigh", SND_SOC_NOPM, 0, 0x7fffffff, 0,
+		tas2555_nReHigh_get, tas2555_nReHigh_put),
+	SOC_SINGLE_EXT("nReLow", SND_SOC_NOPM, 0, 0x7fffffff, 0,
+		tas2555_nReLow_get, tas2555_nReLow_put),
 	SOC_SINGLE_EXT("nRe", SND_SOC_NOPM, 0, 0x7fffffff, 0,
 		tas2555_nRe_get, NULL),
 	SOC_SINGLE_EXT("Calibration", SND_SOC_NOPM, 0, 0x00FF, 0,

@@ -197,7 +197,66 @@ static int tas2555_digital_gain(struct tas2555_priv *pTAS2555, int gain)
 }
 #endif
 
+static int tas2555_dev_load_data(struct tas2555_priv *pTAS2555,
+	unsigned int *pData)
+{
+	int ret = 0;
+	unsigned int n = 0;
+	unsigned int nRegister;
+	unsigned int nData;
+
+	do {
+		nRegister = pData[n * 2];
+		nData = pData[n * 2 + 1];
+		if (nRegister == TAS2555_UDELAY)
+			udelay(nData);
+		else if (nRegister != 0xFFFFFFFF){
+			ret = pTAS2555->write(pTAS2555, nRegister, nData);
+			if(ret < 0) {
+				dev_err(pTAS2555->dev, "Reg Write err %d\n", ret);
+				break;
+			}
+		}
+		n++;
+	} while (nRegister != 0xFFFFFFFF);
+	
+	return ret;
+}
+
+static void failsafe(struct tas2555_priv *pTAS2555)
+{
+	dev_err(pTAS2555->dev, "%s\n", __func__);
+	switch_set_state(&pTAS2555->sw_dev, 1);
+	tas2555_dev_load_data(pTAS2555, p_tas2555_shutdown_data);
+	pTAS2555->mbPowerUp = false;
+	pTAS2555->write(pTAS2555, TAS2555_SW_RESET_REG, 0x01);
+	udelay(1000);
+	pTAS2555->write(pTAS2555, TAS2555_SPK_CTRL_REG, 0x04);
+	if(pTAS2555->mpFirmware != NULL){
+		tas2555_clear_firmware(pTAS2555->mpFirmware);
+	}
+}
+
 #define Q_FACTOR 0x08000000
+
+static bool chkReBoundary(unsigned int ReHigh, unsigned int ReLow)
+{
+	bool ret = false;
+
+	if (ReHigh < Q_FACTOR)
+		goto end;
+
+	if (ReLow < Q_FACTOR)
+		goto end;
+
+	if (ReHigh < ReLow)
+		goto end;
+
+	ret = true;
+
+end:
+	return ret;
+}
 
 int tas2555_get_Re(struct tas2555_priv *pTAS2555, unsigned int *pRe)
 {
@@ -231,6 +290,14 @@ int tas2555_get_Re(struct tas2555_priv *pTAS2555, unsigned int *pRe)
 		/* else 8 Ohm speaker load */
 
 		*pRe = nRe; 
+
+		if (chkReBoundary(pTAS2555->mnReHigh, pTAS2555->mnReLow)) {
+			if ((nRe < pTAS2555->mnReLow) || (nRe > pTAS2555->mnReHigh)) {
+				failsafe(pTAS2555);
+			} else {
+				dev_dbg(pTAS2555->dev, "Re passed check\n");
+			}
+		}
 	}
 
 err:
@@ -238,47 +305,9 @@ err:
 	return ret;
 }
 
-static int tas2555_dev_load_data(struct tas2555_priv *pTAS2555,
-	unsigned int *pData)
-{
-	int ret = 0;
-	unsigned int n = 0;
-	unsigned int nRegister;
-	unsigned int nData;
-
-	do {
-		nRegister = pData[n * 2];
-		nData = pData[n * 2 + 1];
-		if (nRegister == TAS2555_UDELAY)
-			udelay(nData);
-		else if (nRegister != 0xFFFFFFFF){
-			ret = pTAS2555->write(pTAS2555, nRegister, nData);
-			if(ret < 0) {
-				dev_err(pTAS2555->dev, "Reg Write err %d\n", ret);
-				break;
-			}
-		}
-		n++;
-	} while (nRegister != 0xFFFFFFFF);
-	
-	return ret;
-}
-
 int tas2555_load_default(struct tas2555_priv *pTAS2555)
 {
 	return tas2555_dev_load_data(pTAS2555, p_tas2555_default_data);
-}
-
-static void failsafe(struct tas2555_priv *pTAS2555)
-{
-	tas2555_dev_load_data(pTAS2555, p_tas2555_shutdown_data);
-	pTAS2555->mbPowerUp = false;
-	pTAS2555->write(pTAS2555, TAS2555_SW_RESET_REG, 0x01);
-	udelay(1000);
-	pTAS2555->write(pTAS2555, TAS2555_SPK_CTRL_REG, 0x04);
-	if(pTAS2555->mpFirmware != NULL){
-		tas2555_clear_firmware(pTAS2555->mpFirmware);
-	}
 }
 
 int tas2555_enable(struct tas2555_priv *pTAS2555, bool bEnable)
@@ -1511,8 +1540,9 @@ int tas2555_set_program(struct tas2555_priv *pTAS2555,
 	
 	nResult = pTAS2555->write(pTAS2555, TAS2555_SW_RESET_REG, 0x01);
 	if(nResult < 0) goto end;
-	
-	udelay(1000);
+
+	switch_set_state(&pTAS2555->sw_dev, 0);
+	msleep(1);
 	pTAS2555->mnCurrentBook = 0;
 	pTAS2555->mnCurrentPage = 0;
 	

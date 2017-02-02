@@ -169,6 +169,9 @@
 #define TAS2555_RAMP_CLK_DIV_LSB_REG		TAS2555_REG(100, 0, 44)
 
 #define TAS2555_COEFFICENT_RE_REG		TAS2555_REG(120, 39, 20)	/* B0x78_P0x27_R0x14 */
+#define TAS2555_COEFFICENT_A1_REG		TAS2555_REG(120, 39, 44)	/* B0x78_P0x27_R0x2c */
+#define TAS2555_COEFFICENT_A2_REG		TAS2555_REG(120, 39, 48)	/* B0x78_P0x27_R0x30 */
+
 #define TAS2555_DIGITAL_GAIN_REG		TAS2555_REG(140, 42, 100)
 #define TAS2555_COEFFICENT_UPDATE_REG		TAS2555_REG(140, 25, 124)
 
@@ -276,7 +279,7 @@ typedef struct {
 	unsigned char mbPChkSumPresent;
 	unsigned char mnPChkSum;
 	unsigned char mbYChkSumPresent;
-	unsigned char mnYChkSum;		
+	unsigned char mnYChkSum;
 	unsigned int mnCommands;
 	unsigned char *mpData;
 } TBlock;

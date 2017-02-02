@@ -508,6 +508,62 @@ static int tas2555_nRe_get(struct snd_kcontrol *pKcontrol,
 	return 0;
 }
 
+static int tas2555_nF0_a1_get(struct snd_kcontrol *pKcontrol,
+	struct snd_ctl_elem_value *pValue)
+{
+#ifdef KCONTROL_CODEC
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
+#else
+	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
+#endif
+	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
+	unsigned int nA1;
+	int ret;
+
+	mutex_lock(&pTAS2555->codec_lock);
+
+	if ((pTAS2555->mpFirmware->mnConfigurations > 0) && pTAS2555->mbPowerUp) {
+		ret = tas2555_get_f0_a1(pTAS2555, &nA1);
+		if (ret >= 0)
+			pValue->value.integer.value[0] = nA1;
+		else
+			pValue->value.integer.value[0] = 0;
+	}
+
+	mutex_unlock(&pTAS2555->codec_lock);
+
+	dev_dbg(pTAS2555->dev, "tas2555_nF0_a1_get = %d\n", nA1);
+	return 0;
+}
+
+static int tas2555_nF0_a2_get(struct snd_kcontrol *pKcontrol,
+	struct snd_ctl_elem_value *pValue)
+{
+#ifdef KCONTROL_CODEC
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
+#else
+	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
+#endif
+	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
+	unsigned int nA2;
+	int ret;
+
+	mutex_lock(&pTAS2555->codec_lock);
+
+	if ((pTAS2555->mpFirmware->mnConfigurations > 0) && pTAS2555->mbPowerUp) {
+		ret = tas2555_get_f0_a2(pTAS2555, &nA2);
+		if (ret >= 0)
+			pValue->value.integer.value[0] = nA2;
+		else
+			pValue->value.integer.value[0] = 0;
+	}
+
+	mutex_unlock(&pTAS2555->codec_lock);
+
+	dev_dbg(pTAS2555->dev, "tas2555_nF0_a2_get = %d\n", nA2);
+	return 0;
+}
+
 static int tas2555_program_get(struct snd_kcontrol *pKcontrol,
 	struct snd_ctl_elem_value *pValue)
 {
@@ -642,6 +698,10 @@ static const struct snd_kcontrol_new tas2555_snd_controls[] = {
 		tas2555_nReLow_get, tas2555_nReLow_put),
 	SOC_SINGLE_EXT("nRe", SND_SOC_NOPM, 0, 0x7fffffff, 0,
 		tas2555_nRe_get, NULL),
+	SOC_SINGLE_EXT("nF0_A1", SND_SOC_NOPM, 0, 0x7fffffff, 0,
+		tas2555_nF0_a1_get, NULL),
+	SOC_SINGLE_EXT("nF0_A2", SND_SOC_NOPM, 0, 0x7fffffff, 0,
+		tas2555_nF0_a2_get, NULL),
 	SOC_SINGLE_EXT("Calibration", SND_SOC_NOPM, 0, 0x00FF, 0,
 		tas2555_calibration_get, tas2555_calibration_put),
 };

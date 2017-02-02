@@ -305,6 +305,54 @@ err:
 	return ret;
 }
 
+int tas2555_get_f0_a1(struct tas2555_priv *pTAS2555, unsigned int *pA1)
+{
+	int ret = -1;
+	unsigned int nValue;
+	unsigned char Buf[4];
+
+	if (pTAS2555->mbPowerUp) {
+		ret = pTAS2555->bulk_read(pTAS2555, TAS2555_COEFFICENT_A1_REG, Buf, 4);
+		if (ret < 0) {
+			dev_err(pTAS2555->dev, "I2C error\n");
+			goto err;
+		}
+
+		nValue = ((unsigned int)Buf[0] << 24) | ((unsigned int)Buf[1] << 16) 
+				| ((unsigned int)Buf[2] << 8) | Buf[3];
+
+		*pA1 = nValue; 
+	}
+
+err:
+
+	return ret;
+}
+
+int tas2555_get_f0_a2(struct tas2555_priv *pTAS2555, unsigned int *pA2)
+{
+	int ret = -1;
+	unsigned int nValue;
+	unsigned char Buf[4];
+
+	if (pTAS2555->mbPowerUp) {
+		ret = pTAS2555->bulk_read(pTAS2555, TAS2555_COEFFICENT_A2_REG, Buf, 4);
+		if (ret < 0) {
+			dev_err(pTAS2555->dev, "I2C error\n");
+			goto err;
+		}
+
+		nValue = ((unsigned int)Buf[0] << 24) | ((unsigned int)Buf[1] << 16) 
+				| ((unsigned int)Buf[2] << 8) | Buf[3];
+
+		*pA2 = nValue; 
+	}
+
+err:
+
+	return ret;
+}
+
 int tas2555_load_default(struct tas2555_priv *pTAS2555)
 {
 	return tas2555_dev_load_data(pTAS2555, p_tas2555_default_data);

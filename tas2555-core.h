@@ -51,6 +51,8 @@ int tas2555_enable(struct tas2555_priv *pTAS2555, bool bEnable);
 int tas2555_set_sampling_rate(struct tas2555_priv *pTAS2555, 
 	unsigned int nSamplingRate);
 int tas2555_set_config(struct tas2555_priv *pTAS2555, int config);
+int tas2555_get_f0_a1(struct tas2555_priv *pTAS2555, unsigned int *pA1);
+int tas2555_get_f0_a2(struct tas2555_priv *pTAS2555, unsigned int *pA2);
 void tas2555_load_fs_firmware(struct tas2555_priv *pTAS2555,
 	char *pFileName);
 void tas2555_fw_ready(const struct firmware *pFW, void *pContext);

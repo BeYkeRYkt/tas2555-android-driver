@@ -48,19 +48,18 @@ typedef struct {
 } TYCRC;
 
 int tas2555_enable(struct tas2555_priv *pTAS2555, bool bEnable);
+int tas2555_parse_dt(struct device *dev, struct tas2555_priv *pTAS2555);
 int tas2555_set_sampling_rate(struct tas2555_priv *pTAS2555, 
 	unsigned int nSamplingRate);
 int tas2555_set_config(struct tas2555_priv *pTAS2555, int config);
-int tas2555_get_f0_a1(struct tas2555_priv *pTAS2555, unsigned int *pA1);
-int tas2555_get_f0_a2(struct tas2555_priv *pTAS2555, unsigned int *pA2);
 void tas2555_load_fs_firmware(struct tas2555_priv *pTAS2555,
 	char *pFileName);
 void tas2555_fw_ready(const struct firmware *pFW, void *pContext);
-int tas2555_set_program(struct tas2555_priv *pTAS2555,
-	unsigned int nProgram);
+int tas2555_set_program(struct tas2555_priv *pTAS2555, unsigned int nProgram, int nConfig);
 int tas2555_set_calibration(struct tas2555_priv *pTAS2555,
 	int nCalibration);
 int tas2555_get_Re(struct tas2555_priv *pTAS2555, unsigned int *pRe);
+int tas2555_get_errcode(struct tas2555_priv *pTAS2555, unsigned int *pErrCode);
 int tas2555_load_default(struct tas2555_priv *pTAS2555);
 void tas2555_clear_firmware(TFirmware *pFirmware);
 

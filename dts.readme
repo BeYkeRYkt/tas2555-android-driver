@@ -3,5 +3,7 @@ example for dts:
 		tas2555@4c {
 			compatible = "ti,tas2555";
 			reg = <0x4c>;
+			ti,cdc-reset-gpio = <&msmgpio 73 0>;
+			ti,irq-gpio = <&msmgpio 59 0>;
 			status = "okay";
 		};

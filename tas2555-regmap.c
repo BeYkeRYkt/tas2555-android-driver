@@ -58,40 +58,65 @@
 #include "tiload.h"
 #endif
 
-static void tas2555_change_book_page(struct tas2555_priv *pTAS2555, unsigned char nBook,
+static int tas2555_change_book_page(struct tas2555_priv *pTAS2555, unsigned char nBook,
 	unsigned char nPage)
 {
+	int nResult;
+
 	if ((pTAS2555->mnCurrentBook == nBook) 
 		&& pTAS2555->mnCurrentPage == nPage){
-		return;
+		return 0;
 	}
 
 	if (pTAS2555->mnCurrentBook != nBook) {
-		regmap_write(pTAS2555->mpRegmap, TAS2555_BOOKCTL_PAGE, 0);
+		nResult = regmap_write(pTAS2555->mpRegmap, TAS2555_BOOKCTL_PAGE, 0);
+		if (nResult < 0) {
+			dev_err(pTAS2555->dev, "%s, I2C error\n", __func__);
+			pTAS2555->mnErrorCode |= TAS2555_ERROR_I2CIO;
+			goto end;
+		}
 		pTAS2555->mnCurrentPage = 0;
-		regmap_write(pTAS2555->mpRegmap, TAS2555_BOOKCTL_REG, nBook);
+		nResult = regmap_write(pTAS2555->mpRegmap, TAS2555_BOOKCTL_REG, nBook);
+		if (nResult < 0) {
+			dev_err(pTAS2555->dev, "%s, I2C error\n", __func__);
+			pTAS2555->mnErrorCode |= TAS2555_ERROR_I2CIO;
+			goto end;
+		}
 		pTAS2555->mnCurrentBook = nBook;
 		if (nPage != 0) {
-			regmap_write(pTAS2555->mpRegmap, TAS2555_BOOKCTL_PAGE, nPage);
+			nResult = regmap_write(pTAS2555->mpRegmap, TAS2555_BOOKCTL_PAGE, nPage);
+			if (nResult < 0) {
+				dev_err(pTAS2555->dev, "%s, I2C error\n", __func__);
+				pTAS2555->mnErrorCode |= TAS2555_ERROR_I2CIO;
+				goto end;
+			}
 			pTAS2555->mnCurrentPage = nPage;
 		}
 	} else if (pTAS2555->mnCurrentPage != nPage) {
-		regmap_write(pTAS2555->mpRegmap, TAS2555_BOOKCTL_PAGE, nPage);
+		nResult = regmap_write(pTAS2555->mpRegmap, TAS2555_BOOKCTL_PAGE, nPage);
+		if (nResult < 0) {
+			dev_err(pTAS2555->dev, "%s, I2C error\n", __func__);
+			pTAS2555->mnErrorCode |= TAS2555_ERROR_I2CIO;
+			goto end;
+		}
 		pTAS2555->mnCurrentPage = nPage;
 	}
+end:
+
+	return nResult;
 }
 
 static int tas2555_dev_read(struct tas2555_priv *pTAS2555,
 	unsigned int nRegister, unsigned int *pValue)
 {
-	int ret = 0;
+	int nResult = 0;
 
-	mutex_lock(&pTAS2555->dev_lock);	
-	
+	mutex_lock(&pTAS2555->dev_lock);
+
 	if (pTAS2555->mbTILoadActive) {
 		if (!(nRegister & 0x80000000)){
 			mutex_unlock(&pTAS2555->dev_lock);
-			return 0;			// let only reads from TILoad pass.
+			return 0;	/* let only reads from TILoad pass. */
 		}
 		nRegister &= ~0x80000000;
 	}
@@ -101,19 +126,24 @@ static int tas2555_dev_read(struct tas2555_priv *pTAS2555,
 		TAS2555_BOOK_ID(nRegister), TAS2555_PAGE_ID(nRegister),
 		TAS2555_PAGE_REG(nRegister));
 */
-	tas2555_change_book_page(pTAS2555, TAS2555_BOOK_ID(nRegister),
+	nResult = tas2555_change_book_page(pTAS2555, TAS2555_BOOK_ID(nRegister),
 		TAS2555_PAGE_ID(nRegister));
-	ret = regmap_read(pTAS2555->mpRegmap, TAS2555_PAGE_REG(nRegister), pValue);
-
+	if (nResult >= 0) {
+		nResult = regmap_read(pTAS2555->mpRegmap, TAS2555_PAGE_REG(nRegister), pValue);
+		if (nResult < 0) {
+			dev_err(pTAS2555->dev, "%s, I2C error\n", __func__);
+			pTAS2555->mnErrorCode |= TAS2555_ERROR_I2CIO;
+		}
+	}
 	mutex_unlock(&pTAS2555->dev_lock);
-	return ret;
+	return nResult;
 }
 
 static int tas2555_dev_write(struct tas2555_priv *pTAS2555,
 	unsigned int nRegister, unsigned int nValue)
 {
-	int ret = 0;
-	
+	int nResult = 0;
+
 	mutex_lock(&pTAS2555->dev_lock);
 	if ((nRegister == 0xAFFEAFFE) && (nValue == 0xBABEBABE)) {
 		pTAS2555->mbTILoadActive = true;
@@ -135,23 +165,28 @@ static int tas2555_dev_write(struct tas2555_priv *pTAS2555,
 		nRegister &= ~0x80000000;
 	}
 
-	tas2555_change_book_page(pTAS2555, TAS2555_BOOK_ID(nRegister),
+	nResult = tas2555_change_book_page(pTAS2555, TAS2555_BOOK_ID(nRegister),
 		TAS2555_PAGE_ID(nRegister));
 //  dev_err(codec->dev, "%s: BOOK:PAGE:REG %u:%u:%u, VAL: 0x%02x\n",
 //      __func__, TAS2555_BOOK_ID(nRegister), TAS2555_PAGE_ID(nRegister),
 //      TAS2555_PAGE_REG(nRegister), value);
-	ret = regmap_write(pTAS2555->mpRegmap, TAS2555_PAGE_REG(nRegister),
-		nValue);
-	mutex_unlock(&pTAS2555->dev_lock);		
-	
-	return ret;
+	if (nResult >= 0) {
+		nResult = regmap_write(pTAS2555->mpRegmap, TAS2555_PAGE_REG(nRegister), nValue);
+		if (nResult < 0) {
+			dev_err(pTAS2555->dev, "%s, I2C error\n", __func__);
+			pTAS2555->mnErrorCode |= TAS2555_ERROR_I2CIO;
+		}
+	}
+	mutex_unlock(&pTAS2555->dev_lock);
+
+	return nResult;
 }
 
 static int tas2555_dev_bulk_read(struct tas2555_priv *pTAS2555,
 	unsigned int nRegister, u8 * pData, unsigned int nLength)
 {
-	int ret = 0;
-	
+	int nResult = 0;
+
 	mutex_lock(&pTAS2555->dev_lock);
 	if (pTAS2555->mbTILoadActive) {
 		if (!(nRegister & 0x80000000)){
@@ -161,19 +196,24 @@ static int tas2555_dev_bulk_read(struct tas2555_priv *pTAS2555,
 		nRegister &= ~0x80000000;
 	}
 
-	tas2555_change_book_page(pTAS2555, TAS2555_BOOK_ID(nRegister),
+	nResult = tas2555_change_book_page(pTAS2555, TAS2555_BOOK_ID(nRegister),
 		TAS2555_PAGE_ID(nRegister));
-	ret = regmap_bulk_read(pTAS2555->mpRegmap, TAS2555_PAGE_REG(nRegister),
-		pData, nLength);
-	mutex_unlock(&pTAS2555->dev_lock);	
+	if (nResult >= 0) {
+		nResult = regmap_bulk_read(pTAS2555->mpRegmap, TAS2555_PAGE_REG(nRegister), pData, nLength);
+		if (nResult < 0) {
+			dev_err(pTAS2555->dev, "%s, I2C error\n", __func__);
+			pTAS2555->mnErrorCode |= TAS2555_ERROR_I2CIO;
+		}
+	}
+	mutex_unlock(&pTAS2555->dev_lock);
 
-	return ret;
+	return nResult;
 }
 
 static int tas2555_dev_bulk_write(struct tas2555_priv *pTAS2555,
 	unsigned int nRegister, u8 * pData, unsigned int nLength)
 {
-	int ret = 0;
+	int nResult = 0;
 	mutex_lock(&pTAS2555->dev_lock);
 	if (pTAS2555->mbTILoadActive) {
 		if (!(nRegister & 0x80000000)){
@@ -183,22 +223,26 @@ static int tas2555_dev_bulk_write(struct tas2555_priv *pTAS2555,
 		nRegister &= ~0x80000000;
 	}
 
-	tas2555_change_book_page(pTAS2555, TAS2555_BOOK_ID(nRegister),
-		TAS2555_PAGE_ID(nRegister));
-	ret = regmap_bulk_write(pTAS2555->mpRegmap, TAS2555_PAGE_REG(nRegister),
-		pData, nLength);
-	mutex_unlock(&pTAS2555->dev_lock);		
-	
-	return ret;
+	nResult = tas2555_change_book_page(pTAS2555, TAS2555_BOOK_ID(nRegister), TAS2555_PAGE_ID(nRegister));
+	if (nResult >= 0) {
+		nResult = regmap_bulk_write(pTAS2555->mpRegmap, TAS2555_PAGE_REG(nRegister), pData, nLength);
+		if (nResult < 0) {
+			dev_err(pTAS2555->dev, "%s, I2C error\n", __func__);
+			pTAS2555->mnErrorCode |= TAS2555_ERROR_I2CIO;
+		}
+	}
+	mutex_unlock(&pTAS2555->dev_lock);
+
+	return nResult;
 }
 
 static int tas2555_dev_update_bits(struct tas2555_priv *pTAS2555,
 	unsigned int nRegister, unsigned int nMask, unsigned int nValue)
 {
-	int ret = 0;
-	
+	int nResult = 0;
+
 	mutex_lock(&pTAS2555->dev_lock);
-	
+
 	if (pTAS2555->mbTILoadActive) {
 		if (!(nRegister & 0x80000000)){
 			mutex_unlock(&pTAS2555->dev_lock);
@@ -207,13 +251,120 @@ static int tas2555_dev_update_bits(struct tas2555_priv *pTAS2555,
 		nRegister &= ~0x80000000;
 	}
 	
-	tas2555_change_book_page(pTAS2555, TAS2555_BOOK_ID(nRegister),
-		TAS2555_PAGE_ID(nRegister));
-	
-	ret = regmap_update_bits(pTAS2555->mpRegmap, TAS2555_PAGE_REG(nRegister), nMask, nValue);
-		
-	mutex_unlock(&pTAS2555->dev_lock);		
-	return ret;
+	nResult = tas2555_change_book_page(pTAS2555, TAS2555_BOOK_ID(nRegister), TAS2555_PAGE_ID(nRegister));
+	if (nResult >= 0) {
+		nResult = regmap_update_bits(pTAS2555->mpRegmap, TAS2555_PAGE_REG(nRegister), nMask, nValue);
+		if (nResult < 0) {
+			dev_err(pTAS2555->dev, "%s, I2C error\n", __func__);
+			pTAS2555->mnErrorCode |= TAS2555_ERROR_I2CIO;
+		}
+	}
+	mutex_unlock(&pTAS2555->dev_lock);
+	return nResult;
+}
+
+static void tas2555_hw_reset(struct tas2555_priv *pTAS2555)
+{
+#ifdef ENABLE_GPIO_RESET
+	if (gpio_is_valid(pTAS2555->mnResetGPIO)) {
+		devm_gpio_request_one(pTAS2555->dev, pTAS2555->mnResetGPIO,
+			GPIOF_OUT_INIT_LOW, "TAS2555_RST");
+		msleep(10);
+		gpio_set_value_cansleep(pTAS2555->mnResetGPIO, 1);
+		udelay(1000);
+	}
+#endif
+}
+
+int tas2555_enableIRQ(struct tas2555_priv *pTAS2555, bool enable, bool clear)
+{
+	unsigned int nValue;
+	int nResult = 0;
+
+	if (enable) {
+		if (clear) {
+			nResult = pTAS2555->read(pTAS2555, TAS2555_FLAGS_1, &nValue);
+			if (nResult < 0)
+				goto end;
+			nResult = pTAS2555->read(pTAS2555, TAS2555_FLAGS_2, &nValue);
+		}
+
+		if (!pTAS2555->mbIRQEnable) {
+			if (pTAS2555->mnIRQ != 0)
+				enable_irq(pTAS2555->mnIRQ);
+			pTAS2555->mbIRQEnable = true;
+		}
+	} else {
+		if (pTAS2555->mbIRQEnable) {
+			if (pTAS2555->mnIRQ != 0)
+				disable_irq_nosync(pTAS2555->mnIRQ);
+			pTAS2555->mbIRQEnable = false;
+		}
+
+		if (clear) {
+			nResult = pTAS2555->read(pTAS2555, TAS2555_FLAGS_1, &nValue);
+			if (nResult < 0)
+				goto end;
+			nResult = pTAS2555->read(pTAS2555, TAS2555_FLAGS_2, &nValue);
+		}
+	}
+
+end:
+
+	return nResult;
+}
+
+static void irq_work_routine(struct work_struct *work)
+{
+	int nResult = 0;
+	unsigned int nDevInt1Status = 0, nDevInt2Status = 0;
+	struct tas2555_priv *pTAS2555 =
+		container_of(work, struct tas2555_priv, irq_work.work);
+
+	if (!pTAS2555->mbPowerUp)
+		return;
+
+	nResult = tas2555_dev_read(pTAS2555, TAS2555_FLAGS_1, &nDevInt1Status);
+	if (nResult < 0)
+		dev_err(pTAS2555->dev, "I2C doesn't work\n");
+	else
+		nResult = tas2555_dev_read(pTAS2555, TAS2555_FLAGS_2, &nDevInt2Status);
+
+	if ((nDevInt1Status & 0xdc) != 0) {
+		/* in case of INT_OC, INT_UV, INT_OT, INT_BO, INT_CL, INT_CLK1, INT_CLK2 */
+		dev_err(pTAS2555->dev, "critical error INT Status: 0x%x\n", nDevInt1Status);
+		if (nDevInt1Status & 0x04) {
+			pTAS2555->mnErrorCode |= TAS2555_ERROR_CLKPRESENT;
+			nResult = pTAS2555->write(pTAS2555, TAS2555_CLK_ERR_CTRL, 0x00);
+		}
+		if (nDevInt1Status & 0x08)
+			pTAS2555->mnErrorCode |= TAS2555_ERROR_BROWNOUT;
+		if (nDevInt1Status & 0x10)
+			pTAS2555->mnErrorCode |= TAS2555_ERROR_OVERTMP;
+		if (nDevInt1Status & 0x40)
+			pTAS2555->mnErrorCode |= TAS2555_ERROR_UNDERVOLTAGET;
+		if (nDevInt1Status & 0x80)
+			pTAS2555->mnErrorCode |= TAS2555_ERROR_OVERCURRENT;
+		goto program;
+	} else
+		dev_dbg(pTAS2555->dev, "%s, INT Status: 0x%x\n", __func__, nDevInt1Status);
+
+	return;
+
+program:
+	/* hardware reset and reload */
+	tas2555_hw_reset(pTAS2555);
+	tas2555_set_program(pTAS2555, pTAS2555->mnCurrentProgram, pTAS2555->mnCurrentConfiguration);
+}
+
+static irqreturn_t tas2555_irq_handler(int irq, void *dev_id)
+{
+	struct tas2555_priv *pTAS2555 = (struct tas2555_priv *)dev_id;
+
+	tas2555_enableIRQ(pTAS2555, false, false);
+	/* get IRQ status after 100 ms */
+	schedule_delayed_work(&pTAS2555->irq_work, msecs_to_jiffies(100));
+	return IRQ_HANDLED;
 }
 
 static bool tas2555_volatile(struct device *pDev, unsigned int nRegister)
@@ -252,18 +403,10 @@ static int tas2555_i2c_probe(struct i2c_client *pClient,
 	i2c_set_clientdata(pClient, pTAS2555);
 	dev_set_drvdata(&pClient->dev, pTAS2555);
 
-#ifdef ENABLE_GPIO_RESET
-	pTAS2555->reset_gpio =
-		of_get_named_gpio(pClient->dev.of_node, "ti,reset-gpio", 0);
-	dev_info(&pClient->dev, "reset gpio is %d\n", pTAS2555->reset_gpio);
-	if (gpio_is_valid(pTAS2555->reset_gpio)) {
-		devm_gpio_request_one(&pClient->dev, pTAS2555->reset_gpio,
-			GPIOF_OUT_INIT_LOW, "TAS2555_RST");
-		msleep(10);
-		gpio_set_value_cansleep(pTAS2555->reset_gpio, 1);
-		udelay(1000);
-	}
-#endif
+	if (pClient->dev.of_node)
+		tas2555_parse_dt(&pClient->dev, pTAS2555);
+
+	tas2555_hw_reset(pTAS2555);
 
 	pTAS2555->mpRegmap = devm_regmap_init_i2c(pClient, &tas2555_i2c_regmap);
 	if (IS_ERR(pTAS2555->mpRegmap)) {
@@ -278,6 +421,8 @@ static int tas2555_i2c_probe(struct i2c_client *pClient,
 	pTAS2555->bulk_read = tas2555_dev_bulk_read;
 	pTAS2555->bulk_write = tas2555_dev_bulk_write;
 	pTAS2555->update_bits = tas2555_dev_update_bits;
+	pTAS2555->enableIRQ = tas2555_enableIRQ;
+	pTAS2555->hw_reset = tas2555_hw_reset;
 	pTAS2555->set_config = tas2555_set_config;
 	pTAS2555->set_calibration = tas2555_set_calibration;
 		
@@ -308,17 +453,34 @@ static int tas2555_i2c_probe(struct i2c_client *pClient,
 	pTAS2555->mnCurrentPage = 0;
 	pTAS2555->mnCurrentBook = 0;
 
+	if (gpio_is_valid(pTAS2555->mnGpioINT)) {
+		nResult = gpio_request(pTAS2555->mnGpioINT, "TAS2555-IRQ");
+		if (nResult < 0) {
+			dev_err(pTAS2555->dev,
+				"%s: GPIO %d request INT error\n",
+				__func__, pTAS2555->mnGpioINT);
+			goto fail;
+		}
+
+		gpio_direction_input(pTAS2555->mnGpioINT);
+		pTAS2555->mnIRQ = gpio_to_irq(pTAS2555->mnGpioINT);
+		dev_dbg(pTAS2555->dev, "irq = %d\n", pTAS2555->mnIRQ);
+		nResult = request_threaded_irq(pTAS2555->mnIRQ, tas2555_irq_handler,
+				NULL, IRQF_TRIGGER_RISING | IRQF_ONESHOT,
+				pClient->name, pTAS2555);
+		if (nResult < 0) {
+			dev_err(pTAS2555->dev,
+				"request_irq failed, %d\n", nResult);
+			goto fail;
+		}
+
+		INIT_DELAYED_WORK(&pTAS2555->irq_work, irq_work_routine);
+	}
+
 	nResult = tas2555_dev_read(pTAS2555, TAS2555_REV_PGID_REG, &n);
 	dev_info(&pClient->dev, "TAS2555 PGID: 0x%02x\n", n);
 
 	pTAS2555->mbTILoadActive = false;
-
-	pTAS2555->sw_dev.name = "TAS2555-failsafe";
-	nResult = switch_dev_register(&pTAS2555->sw_dev);
-	if (nResult < 0) {
-		dev_err(pTAS2555->dev, "fail to register switch device\n");
-		goto fail;
-	}
 
 #ifdef CONFIG_TAS2555_CODEC	
 	mutex_init(&pTAS2555->codec_lock);
@@ -347,8 +509,6 @@ static int tas2555_i2c_remove(struct i2c_client *pClient)
 	struct tas2555_priv *pTAS2555 = i2c_get_clientdata(pClient);
 
 	dev_info(pTAS2555->dev, "%s\n", __FUNCTION__);
-
-	switch_dev_unregister(&pTAS2555->sw_dev);
 
 #ifdef CONFIG_TAS2555_CODEC		
 	tas2555_deregister_codec(pTAS2555);

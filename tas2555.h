@@ -70,8 +70,8 @@
 #define TAS2555_NONAME42_REG			TAS2555_REG(0, 0, 42)
 #define TAS2555_CLK_ERR_CTRL			TAS2555_REG(0, 0, 44)
 #define TAS2555_POWER_UP_FLAG_REG		TAS2555_REG(0, 0, 100)
-#define TAS2555_FLAGS_1				TAS2555_REG(0, 0, 104)
-#define TAS2555_FLAGS_2				TAS2555_REG(0, 0, 108)
+#define TAS2555_FLAGS_1				TAS2555_REG(0, 0, 104)	/* B0_P0_R0x68*/
+#define TAS2555_FLAGS_2				TAS2555_REG(0, 0, 108)	/* B0_P0_R0x6c*/
 /* Book0, Page1 registers */
 #define TAS2555_ASI1_DAC_FORMAT_REG		TAS2555_REG(0, 1, 1)
 #define TAS2555_ASI1_ADC_FORMAT_REG		TAS2555_REG(0, 1, 2)
@@ -140,6 +140,12 @@
 #define TAS2555_ASIM_IFACE7_REG			TAS2555_REG(0, 1, 104)
 #define TAS2555_ASIM_IFACE8_REG			TAS2555_REG(0, 1, 105)
 #define TAS2555_ASIM_IFACE9_REG			TAS2555_REG(0, 1, 106)
+
+#define TAS2555_INT_GEN1_REG			TAS2555_REG(0, 1, 108)	/* B0_P1_R0x6c */
+#define TAS2555_INT_GEN2_REG			TAS2555_REG(0, 1, 109)
+#define TAS2555_INT_GEN3_REG			TAS2555_REG(0, 1, 110)	/* B0_P1_R0x6e */
+#define TAS2555_INT_GEN4_REG			TAS2555_REG(0, 1, 111)	/* B0_P1_R0x6f */
+#define TAS2555_INT_MODE_REG			TAS2555_REG(0, 1, 114)	/* B0_P1_R0x72 */
 
 #define TAS2555_MAIN_CLKIN_REG			TAS2555_REG(0, 1, 115)
 #define TAS2555_PLL_CLKIN_REG			TAS2555_REG(0, 1, 116)	/* B0_P1_R0x74 */
@@ -274,6 +280,22 @@
 
 #define ARRAY_LEN(x) ((int)(sizeof(x)/sizeof((x)[0])))
 
+#define TAS2555_ERROR_I2CIO			0x00000001
+#define TAS2555_ERROR_PCHKSUM		0x00000002
+#define TAS2555_ERROR_YCHKSUM		0x00000004
+#define TAS2555_ERROR_FWFORMAT		0x00000008
+#define TAS2555_ERROR_RETOOHIGH		0x00000010
+#define TAS2555_ERROR_RETOOLOW		0x00000020
+#define TAS2555_ERROR_FWNOTLOAD		0x00000040
+#define TAS2555_ERROR_INVALIDPARAM	0x00000080
+#define TAS2555_ERROR_VALUENOTMATCH	0x01000000
+#define TAS2555_ERROR_OVERTMP		0x02000000
+#define TAS2555_ERROR_CLKPRESENT	0x04000000
+#define TAS2555_ERROR_BROWNOUT		0x08000000
+#define TAS2555_ERROR_UNDERVOLTAGET	0x10000000
+#define TAS2555_ERROR_OVERCURRENT	0x20000000
+#define TAS2555_ERROR_FAILSAFE		0x40000000
+
 typedef struct {
 	unsigned int mnType;
 	unsigned char mbPChkSumPresent;
@@ -361,20 +383,25 @@ struct tas2555_priv {
 	unsigned char mnCurrentBook;
 	unsigned char mnCurrentPage;
 	bool mbTILoadActive;
-	int reset_gpio;
+	int mnResetGPIO;
 	bool mbPowerUp;
 	bool mbLoadConfigurationPostPowerUp;
 
 	unsigned int mnPowerCtrl;
 
 	/* to notify user critical condition */
-	struct switch_dev sw_dev;
-	unsigned int mnReHigh;
-	unsigned int mnReLow;
+	unsigned int mnReLastKnown;
+	unsigned int mnReOrignal;
+	unsigned int mnReDelta;
 
 	/* factory test and calibration */
 	bool mbLoadCalibrationPostPowerUp;
 	bool mbCalibrationLoaded;
+
+	int mnGpioINT;
+	struct delayed_work irq_work;
+	unsigned int mnIRQ;
+	bool mbIRQEnable;
 
 	int (*read)(struct tas2555_priv * pTAS2555, unsigned int reg,
 		unsigned int *pValue);
@@ -386,16 +413,22 @@ struct tas2555_priv {
 		unsigned char *pData, unsigned int len);
 	int (*update_bits)(struct tas2555_priv * pTAS2555, unsigned int reg,
 		unsigned int mask, unsigned int value);
+	int (*enableIRQ)(struct tas2555_priv *pTAS2555, bool enable, bool clear);
+	void (*hw_reset)(struct tas2555_priv *pTAS2555);
 	int (*set_config)(struct tas2555_priv *pTAS2555, int config);
 	int (*set_calibration)(struct tas2555_priv *pTAS2555, int calibration);
+
 #ifdef CONFIG_TAS2555_CODEC
 	struct mutex codec_lock;
-#endif	
+#endif
+
 #ifdef CONFIG_TAS2555_MISC
 	int mnDBGCmd;
 	int mnCurrentReg;
 	struct mutex file_lock;
 #endif
+
+	unsigned int mnErrorCode;
 };
 
 #endif /* _TAS2555_H */

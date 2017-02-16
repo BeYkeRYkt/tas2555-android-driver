@@ -108,6 +108,8 @@ static unsigned int p_tas2555_default_data[] = {
 
 static unsigned int p_tas2555_irq_config[] = {
 	/* TAS2555_GPIO4_PIN_REG, 0x07,	set GPIO4 as int1, default */
+//	TAS2555_CLK_ERR_CTRL2, 0x11,	//enable clock error detection on PLL
+//	TAS2555_CLK_ERR_CTRL3, 0x11,	//enable clock error detection on PLL
 	TAS2555_INT_GEN1_REG, 0x11,	/* enable spk OC and OV */
 	TAS2555_INT_GEN2_REG, 0x11,	/* enable clk err1 and die OT */
 	TAS2555_INT_GEN3_REG, 0x11,	/* enable clk err2 and brownout */
@@ -118,7 +120,7 @@ static unsigned int p_tas2555_irq_config[] = {
 
 #define TAS2555_STARTUP_DATA_PLL_CLKIN_INDEX 3
 static unsigned int p_tas2555_startup_data[] = {
-	TAS2555_CLK_ERR_CTRL, 0x0b,	//enable clock error detection on PLL
+	TAS2555_CLK_ERR_CTRL1, 0x00,	//disable clock error detection on PLL
 	TAS2555_PLL_CLKIN_REG, TAS2555_DEFAULT_PLL_CLKIN,
 	TAS2555_POWER_CTRL2_REG, 0xA0,	//Class-D, Boost power up
 	TAS2555_POWER_CTRL2_REG, 0xA3,	//Class-D, Boost, IV sense power up
@@ -134,6 +136,7 @@ static unsigned int p_tas2555_unmute_data[] = {
 };
 
 static unsigned int p_tas2555_shutdown_data[] = {
+	TAS2555_CLK_ERR_CTRL1, 0x00,	//disable clock error detection
 	TAS2555_SOFT_MUTE_REG, 0x01,	//soft mute
 	TAS2555_UDELAY, 10000,		//delay 10ms
 	TAS2555_MUTE_REG, 0x03,		//mute
@@ -153,6 +156,7 @@ static unsigned int p_tas2555_shutdown_clk_err[] = {
 #endif
 
 static unsigned int p_tas2555_mute_DSP_down_data[] = {
+	TAS2555_CLK_ERR_CTRL1, 0x00,	//disable clock error detection
 	TAS2555_MUTE_REG, 0x03,		//mute
 	TAS2555_PLL_CLKIN_REG, 0x0F,	//PLL clock input = osc
 	TAS2555_POWER_CTRL1_REG, 0x60,	//DSP power down
@@ -239,14 +243,16 @@ static void failsafe(struct tas2555_priv *pTAS2555)
 {
 	dev_err(pTAS2555->dev, "%s\n", __func__);
 	pTAS2555->mnErrorCode |= TAS2555_ERROR_FAILSAFE;
-	tas2555_enable(pTAS2555, false);
+	dev_dbg(pTAS2555->dev, "Enable: load shutdown sequence\n");
+	tas2555_dev_load_data(pTAS2555, p_tas2555_shutdown_data);
+	//tas2555_dev_load_data(pTAS2555, p_tas2555_shutdown_clk_err);
+	if (pTAS2555->mpFirmware != NULL)
+		tas2555_clear_firmware(pTAS2555->mpFirmware);
+	pTAS2555->mbPowerUp = false;
 	pTAS2555->hw_reset(pTAS2555);
 	pTAS2555->write(pTAS2555, TAS2555_SW_RESET_REG, 0x01);
 	udelay(1000);
 	pTAS2555->write(pTAS2555, TAS2555_SPK_CTRL_REG, 0x04);
-	if(pTAS2555->mpFirmware != NULL){
-		tas2555_clear_firmware(pTAS2555->mpFirmware);
-	}
 }
 
 #define Q_FACTOR 0x08000000
@@ -257,9 +263,14 @@ static bool chkReBoundary(struct tas2555_priv *pTAS2555,
 	bool nResult = false;
 	unsigned int ReHigh_calc, ReLow_calc, Re_calc = 0;
 	static unsigned int counter = 3;
-	
+
 	if (ReOrginal < Q_FACTOR)
 		goto end;
+
+	if (ReDelta == 0) {
+		dev_err(pTAS2555->dev, "need to set ReDelta!");
+		goto end;
+	}
 
 	switch (scale) {
 	case 0:
@@ -302,7 +313,8 @@ static bool chkReBoundary(struct tas2555_priv *pTAS2555,
 			counter = 3;
 
 		if (counter == 0) {
-			counter = 3;
+			dev_err(pTAS2555->dev, "will failsafe, OrigRe=%d, Delta_Re=%d, Re=%d, scale=%d\n",
+				ReOrginal, ReDelta, Re, scale);
 			nResult = true;
 		}
 	}
@@ -373,7 +385,7 @@ int tas2555_get_errcode(struct tas2555_priv *pTAS2555, unsigned int *pErrCode)
 
 		if (nValue & 0x04) {
 			errcode |= TAS2555_ERROR_CLKPRESENT;
-			nResult = pTAS2555->write(pTAS2555, TAS2555_CLK_ERR_CTRL, 0x00);
+			nResult = pTAS2555->write(pTAS2555, TAS2555_CLK_ERR_CTRL1, 0x00);
 		}
 		if (nValue & 0x08)
 			errcode |= TAS2555_ERROR_BROWNOUT;
@@ -423,8 +435,15 @@ int tas2555_load_default(struct tas2555_priv *pTAS2555)
 int tas2555_enable(struct tas2555_priv *pTAS2555, bool bEnable)
 {
 	int nResult = 0;
-	
+
 	dev_dbg(pTAS2555->dev, "Enable: %d\n", bEnable);
+
+	if ((pTAS2555->mpFirmware->mnPrograms == 0)
+		||(pTAS2555->mpFirmware->mnConfigurations == 0)) {
+			pTAS2555->mnErrorCode |= TAS2555_ERROR_FWNOTLOAD;
+			goto end;
+		}
+
 	if (bEnable) {
 		if (!pTAS2555->mbPowerUp) {
 			TConfiguration *pConfiguration;
@@ -1775,8 +1794,10 @@ int tas2555_set_calibration(struct tas2555_priv *pTAS2555,
 	if(pTAS2555->mbPowerUp){
 		nResult = tas2555_load_block(pTAS2555, 
 			&(pTAS2555->mpCalFirmware->mpCalibrations[pTAS2555->mnCurrentCalibration].mBlock));
-		if (nResult >= 0)
+		if (nResult >= 0) {
 			pTAS2555->mbLoadCalibrationPostPowerUp = false; 
+			nResult = tas2555_get_ReCoefficient(pTAS2555, &pTAS2555->mnReOrignal);
+		}
 	}else{
 		pTAS2555->mbLoadCalibrationPostPowerUp = true; 
 	}

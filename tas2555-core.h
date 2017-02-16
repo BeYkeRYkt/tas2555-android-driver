@@ -28,19 +28,19 @@
 
 #include "tas2555.h"
 
-#define TAS2555_YRAM_BOOK				140
-#define TAS2555_YRAM1_PAGE				42
-#define TAS2555_YRAM1_START_REG			88
-#define TAS2555_YRAM1_END_REG			127
+#define TAS2555_YRAM_BOOK				140	/* BOOK: 0x8c */
+#define TAS2555_YRAM1_PAGE				42	/* Page: 0x2a */
+#define TAS2555_YRAM1_START_REG			88	/* Reg: 0x58 */
+#define TAS2555_YRAM1_END_REG			127	/* Reg: 0x7f */
 
-#define TAS2555_YRAM2_START_PAGE		43
-#define TAS2555_YRAM2_END_PAGE			52
+#define TAS2555_YRAM2_START_PAGE		43	/* Page: 0x2b */
+#define TAS2555_YRAM2_END_PAGE			52	/* Page: 0x34 */
 #define TAS2555_YRAM2_START_REG			8
 #define TAS2555_YRAM2_END_REG			127
 
-#define TAS2555_YRAM3_PAGE				53
+#define TAS2555_YRAM3_PAGE				53	/* Page: 0x35 */
 #define TAS2555_YRAM3_START_REG			8
-#define TAS2555_YRAM3_END_REG			55
+#define TAS2555_YRAM3_END_REG			55	/* Reg: 0x37 */
 
 typedef struct {
 	unsigned char mnOffset;

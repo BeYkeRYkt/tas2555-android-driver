@@ -68,10 +68,7 @@ static unsigned int tas2555_codec_read(struct snd_soc_codec *pCodec,
 	int ret = 0;
 	unsigned int Value = 0;
 
-	mutex_lock(&pTAS2555->codec_lock);
 	ret = pTAS2555->read(pTAS2555, nRegister, &Value);
-	mutex_unlock(&pTAS2555->codec_lock);
-	
 	if (ret < 0) {
 		dev_err(pTAS2555->dev, "%s, %d, ERROR happen=%d\n", __FUNCTION__,
 			__LINE__, ret);
@@ -85,10 +82,9 @@ static int tas2555_codec_write(struct snd_soc_codec *pCodec, unsigned int nRegis
 {
 	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(pCodec);
 	int ret = 0;
-	mutex_lock(&pTAS2555->codec_lock);
+
 	ret = pTAS2555->write(pTAS2555, nRegister, nValue);
-	mutex_unlock(&pTAS2555->codec_lock);
-	
+
 	return ret;
 }
 
@@ -140,12 +136,10 @@ static int tas2555_mute(struct snd_soc_dai *dai, int mute)
 {
 	struct snd_soc_codec *codec = dai->codec;
 	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
-	
+
 	dev_dbg(pTAS2555->dev, "%s\n", __func__);
-	mutex_lock(&pTAS2555->codec_lock);
 	tas2555_enable(pTAS2555, !mute);
-	mutex_unlock(&pTAS2555->codec_lock);
-	
+
 	return 0;
 }
 
@@ -167,10 +161,8 @@ static int tas2555_hw_params(struct snd_pcm_substream *pSubstream,
 	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(pCodec);
 
 	dev_dbg(pCodec->dev, "%s\n", __func__);
-	
-	mutex_lock(&pTAS2555->codec_lock);
+
 	tas2555_set_sampling_rate(pTAS2555, params_rate(pParams));
-	mutex_unlock(&pTAS2555->codec_lock);
 
 	return 0;
 }
@@ -179,9 +171,9 @@ static int tas2555_set_dai_fmt(struct snd_soc_dai *pDAI, unsigned int nFormat)
 {
 	struct snd_soc_codec *codec = pDAI->codec;
 	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
-	
+
 	dev_dbg(pTAS2555->dev, "%s\n", __func__);
-	
+
 	return 0;
 }
 
@@ -190,9 +182,9 @@ static int tas2555_prepare(struct snd_pcm_substream *pSubstream,
 {
 	struct snd_soc_codec *codec = pDAI->codec;
 	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
-	
+
 	dev_dbg(pTAS2555->dev, "%s\n", __func__);
-	
+
 	return 0;
 }
 
@@ -200,7 +192,7 @@ static int tas2555_set_bias_level(struct snd_soc_codec *pCodec,
 	enum snd_soc_bias_level eLevel)
 {
 	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(pCodec);
-	
+
 	dev_dbg(pTAS2555->dev, "%s: %d\n", __func__, eLevel);
 
 	return 0;
@@ -272,8 +264,6 @@ static int tas2555_get_reg_value(struct snd_kcontrol *pKcontrol,
 	unsigned int reg;
 	unsigned int nValue;
 
-	mutex_lock(&pTAS2555->codec_lock);	
-	
 	if (TAS2555_REG_IS_VALID(register_addr.book,
 			register_addr.page, register_addr.reg)) {
 		reg = TAS2555_REG((unsigned int) register_addr.book,
@@ -289,8 +279,7 @@ static int tas2555_get_reg_value(struct snd_kcontrol *pKcontrol,
 	dev_dbg(pTAS2555->dev, "%s: Read [%d, %d, %d] = %ld\n", __func__,
 		register_addr.book, register_addr.page, register_addr.reg,
 		pUcontrol->value.integer.value[0]);
-		
-	mutex_unlock(&pTAS2555->codec_lock);
+
 	return 0;
 }
 
@@ -305,8 +294,6 @@ static int tas2555_put_reg_value(struct snd_kcontrol *pKcontrol,
 	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
 	unsigned int reg;
 
-	mutex_lock(&pTAS2555->codec_lock);
-	
 	if (TAS2555_REG_IS_VALID(register_addr.book,
 			register_addr.page, register_addr.reg)) {
 		reg = TAS2555_REG((unsigned int) register_addr.book,
@@ -321,7 +308,6 @@ static int tas2555_put_reg_value(struct snd_kcontrol *pKcontrol,
 		register_addr.book, register_addr.page, register_addr.reg,
 		pUcontrol->value.integer.value[0]);
 
-	mutex_unlock(&pTAS2555->codec_lock);			
 	return 0;
 }
 
@@ -335,13 +321,10 @@ static int tas2555_power_ctrl_get(struct snd_kcontrol *pKcontrol,
 #endif
 	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
 
-	mutex_lock(&pTAS2555->codec_lock);	
-	
 	pValue->value.integer.value[0] = pTAS2555->mnPowerCtrl;
 	dev_dbg(pTAS2555->dev, "tas2555_power_ctrl_get = %d\n",
 		pTAS2555->mnPowerCtrl);
-		
-	mutex_unlock(&pTAS2555->codec_lock);			
+
 	return 0;
 }
 
@@ -355,7 +338,6 @@ static int tas2555_power_ctrl_put(struct snd_kcontrol *pKcontrol,
 #endif
 	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
 
-	mutex_lock(&pTAS2555->codec_lock);	
 	pTAS2555->mnPowerCtrl = pValue->value.integer.value[0];
 
 	dev_dbg(pTAS2555->dev, "tas2555_power_ctrl_put = %d\n",
@@ -365,8 +347,7 @@ static int tas2555_power_ctrl_put(struct snd_kcontrol *pKcontrol,
 		tas2555_enable(pTAS2555, true);
 	if (pTAS2555->mnPowerCtrl == 0)
 		tas2555_enable(pTAS2555, false);
-		
-	mutex_unlock(&pTAS2555->codec_lock);
+
 	return 0;
 }
 
@@ -379,18 +360,13 @@ static int tas2555_fs_get(struct snd_kcontrol *pKcontrol,
 	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
 #endif
 	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
-
 	int nFS = 48000;
 
-	mutex_lock(&pTAS2555->codec_lock);
-	
 	if (pTAS2555->mpFirmware->mnConfigurations)
 		nFS = pTAS2555->mpFirmware->mpConfigurations[pTAS2555->mnCurrentConfiguration].mnSamplingRate;
-	
+
 	pValue->value.integer.value[0] = nFS;
-	
-	mutex_unlock(&pTAS2555->codec_lock);
-	
+
 	dev_dbg(pTAS2555->dev, "tas2555_fs_get = %d\n", nFS);
 	return 0;
 }
@@ -406,13 +382,11 @@ static int tas2555_fs_put(struct snd_kcontrol *pKcontrol,
 	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
 	int ret = 0;
 	int nFS = pValue->value.integer.value[0];
-	
+
 	dev_info(pTAS2555->dev, "tas2555_fs_put = %d\n", nFS);
-	
-	mutex_lock(&pTAS2555->codec_lock);	
+
 	ret = tas2555_set_sampling_rate(pTAS2555, nFS);
-	
-	mutex_unlock(&pTAS2555->codec_lock);
+
 	return ret;
 }
 
@@ -425,10 +399,8 @@ static int tas2555_nRe_get(struct snd_kcontrol *pKcontrol,
 	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
 #endif
 	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
-	unsigned int nRe;
-	int ret;
-
-	mutex_lock(&pTAS2555->codec_lock);
+	unsigned int nRe = 0;
+	int ret = 0;
 
 	if ((pTAS2555->mpFirmware->mnConfigurations > 0) && pTAS2555->mbPowerUp) {
 		ret = tas2555_get_Re(pTAS2555, &nRe);
@@ -437,8 +409,6 @@ static int tas2555_nRe_get(struct snd_kcontrol *pKcontrol,
 		else
 			pValue->value.integer.value[0] = 0;
 	}
-
-	mutex_unlock(&pTAS2555->codec_lock);
 
 	dev_dbg(pTAS2555->dev, "tas2555_nRe_get = %d\n", nRe);
 	return 0;
@@ -456,13 +426,9 @@ static int tas2555_errcode_get(struct snd_kcontrol *pKcontrol,
 	unsigned int errCode = 0;
 	int nResult;
 
-	mutex_lock(&pTAS2555->codec_lock);
-
 	nResult = tas2555_get_errcode(pTAS2555, &errCode);
 	if (nResult >= 0)
 		pValue->value.integer.value[0] = errCode;
-
-	mutex_unlock(&pTAS2555->codec_lock);
 
 	dev_dbg(pTAS2555->dev, "tas2555_errcode_get = 0x%x\n", errCode);
 	return 0;
@@ -477,11 +443,10 @@ static int tas2555_program_get(struct snd_kcontrol *pKcontrol,
 	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
 #endif
 	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
-	mutex_lock(&pTAS2555->codec_lock);	
+
 	pValue->value.integer.value[0] = pTAS2555->mnCurrentProgram;
 	dev_dbg(pTAS2555->dev, "tas2555_program_get = %d\n",
 		pTAS2555->mnCurrentProgram);
-	mutex_unlock(&pTAS2555->codec_lock);
 	return 0;
 }
 
@@ -496,9 +461,8 @@ static int tas2555_program_put(struct snd_kcontrol *pKcontrol,
 	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
 	unsigned int nProgram = pValue->value.integer.value[0];
 	int ret = 0;
-	mutex_lock(&pTAS2555->codec_lock);
+
 	ret = tas2555_set_program(pTAS2555, nProgram, -1);
-	mutex_unlock(&pTAS2555->codec_lock);
 	return ret;
 }
 
@@ -512,11 +476,9 @@ static int tas2555_configuration_get(struct snd_kcontrol *pKcontrol,
 #endif
 	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
 
-	mutex_lock(&pTAS2555->codec_lock);
 	pValue->value.integer.value[0] = pTAS2555->mnCurrentConfiguration;
 	dev_dbg(pTAS2555->dev, "tas2555_configuration_get = %d\n",
 		pTAS2555->mnCurrentConfiguration);
-	mutex_unlock(&pTAS2555->codec_lock);
 	return 0;
 }
 
@@ -532,9 +494,7 @@ static int tas2555_configuration_put(struct snd_kcontrol *pKcontrol,
 	unsigned int nConfiguration = pValue->value.integer.value[0];
 	int ret = 0;
 
-	mutex_lock(&pTAS2555->codec_lock);
 	ret = tas2555_set_config(pTAS2555, nConfiguration);
-	mutex_unlock(&pTAS2555->codec_lock);
 	return ret;
 }
 
@@ -548,12 +508,10 @@ static int tas2555_calibration_get(struct snd_kcontrol *pKcontrol,
 #endif
 	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
 
-	mutex_lock(&pTAS2555->codec_lock);
 	pValue->value.integer.value[0] = pTAS2555->mnCurrentCalibration;
 	dev_info(pTAS2555->dev,
 		"tas2555_calibration_get = %d\n",
 		pTAS2555->mnCurrentCalibration);
-	mutex_unlock(&pTAS2555->codec_lock);
 	return 0;
 }
 
@@ -569,9 +527,7 @@ static int tas2555_calibration_put(struct snd_kcontrol *pKcontrol,
 	unsigned int nCalibration = pValue->value.integer.value[0];
 	int ret = 0;
 
-	mutex_lock(&pTAS2555->codec_lock);
 	ret = tas2555_set_calibration(pTAS2555, nCalibration);
-	mutex_unlock(&pTAS2555->codec_lock);
 
 	return ret;
 }
@@ -717,14 +673,14 @@ int tas2555_register_codec(struct tas2555_priv *pTAS2555)
 	nResult = snd_soc_register_codec(pTAS2555->dev, 
 		&soc_codec_driver_tas2555,
 		tas2555_dai_driver, ARRAY_SIZE(tas2555_dai_driver));
-		
+
 	return nResult;
 }
 
 int tas2555_deregister_codec(struct tas2555_priv *pTAS2555)
 {
 	snd_soc_unregister_codec(pTAS2555->dev);
-		
+
 	return 0;
 }
 

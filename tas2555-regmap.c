@@ -335,7 +335,7 @@ static void irq_work_routine(struct work_struct *work)
 		dev_err(pTAS2555->dev, "critical error INT Status: 0x%x\n", nDevInt1Status);
 		if (nDevInt1Status & 0x04) {
 			pTAS2555->mnErrorCode |= TAS2555_ERROR_CLKPRESENT;
-			nResult = pTAS2555->write(pTAS2555, TAS2555_CLK_ERR_CTRL, 0x00);
+			nResult = pTAS2555->write(pTAS2555, TAS2555_CLK_ERR_CTRL1, 0x00);
 		}
 		if (nDevInt1Status & 0x08)
 			pTAS2555->mnErrorCode |= TAS2555_ERROR_BROWNOUT;
@@ -483,7 +483,6 @@ static int tas2555_i2c_probe(struct i2c_client *pClient,
 	pTAS2555->mbTILoadActive = false;
 
 #ifdef CONFIG_TAS2555_CODEC	
-	mutex_init(&pTAS2555->codec_lock);
 	tas2555_register_codec(pTAS2555);
 #endif
 
@@ -512,7 +511,6 @@ static int tas2555_i2c_remove(struct i2c_client *pClient)
 
 #ifdef CONFIG_TAS2555_CODEC		
 	tas2555_deregister_codec(pTAS2555);
-	mutex_destroy(&pTAS2555->codec_lock);
 #endif
 
 #ifdef CONFIG_TAS2555_MISC		

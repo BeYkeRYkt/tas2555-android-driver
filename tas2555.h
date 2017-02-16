@@ -68,7 +68,9 @@
 #define TAS2555_CRC_RESET_REG			TAS2555_REG(0, 0, 33)
 #define TAS2555_DSP_MODE_SELECT_REG		TAS2555_REG(0, 0, 34)
 #define TAS2555_NONAME42_REG			TAS2555_REG(0, 0, 42)
-#define TAS2555_CLK_ERR_CTRL			TAS2555_REG(0, 0, 44)
+#define TAS2555_CLK_ERR_CTRL1			TAS2555_REG(0, 0, 44)
+#define TAS2555_CLK_ERR_CTRL2			TAS2555_REG(0, 0, 45)
+#define TAS2555_CLK_ERR_CTRL3			TAS2555_REG(0, 0, 46)
 #define TAS2555_POWER_UP_FLAG_REG		TAS2555_REG(0, 0, 100)
 #define TAS2555_FLAGS_1				TAS2555_REG(0, 0, 104)	/* B0_P0_R0x68*/
 #define TAS2555_FLAGS_2				TAS2555_REG(0, 0, 108)	/* B0_P0_R0x6c*/
@@ -417,10 +419,6 @@ struct tas2555_priv {
 	void (*hw_reset)(struct tas2555_priv *pTAS2555);
 	int (*set_config)(struct tas2555_priv *pTAS2555, int config);
 	int (*set_calibration)(struct tas2555_priv *pTAS2555, int calibration);
-
-#ifdef CONFIG_TAS2555_CODEC
-	struct mutex codec_lock;
-#endif
 
 #ifdef CONFIG_TAS2555_MISC
 	int mnDBGCmd;

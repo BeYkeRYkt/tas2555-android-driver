@@ -414,6 +414,20 @@ static int tas2555_nRe_get(struct snd_kcontrol *pKcontrol,
 	return 0;
 }
 
+static int tas2555_nRe_put(struct snd_kcontrol *pKcontrol,
+	struct snd_ctl_elem_value *pValue)
+{
+#ifdef KCONTROL_CODEC
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
+#else
+	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
+#endif
+	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
+
+	dev_dbg(pTAS2555->dev, "ignore tas2555_nRe_put\n");
+	return 0;
+}
+
 static int tas2555_errcode_get(struct snd_kcontrol *pKcontrol,
 	struct snd_ctl_elem_value *pValue)
 {
@@ -431,6 +445,20 @@ static int tas2555_errcode_get(struct snd_kcontrol *pKcontrol,
 		pValue->value.integer.value[0] = errCode;
 
 	dev_dbg(pTAS2555->dev, "tas2555_errcode_get = 0x%x\n", errCode);
+	return 0;
+}
+
+static int tas2555_errcode_put(struct snd_kcontrol *pKcontrol,
+	struct snd_ctl_elem_value *pValue)
+{
+#ifdef KCONTROL_CODEC
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
+#else
+	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
+#endif
+	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
+
+	dev_dbg(pTAS2555->dev, "ignore tas2555_errcode_put\n");
 	return 0;
 }
 
@@ -564,6 +592,79 @@ static int tas2555_nReDelta_put(struct snd_kcontrol *pKcontrol,
 	return 0;
 }
 
+static int tas2555_fail_safe_get(struct snd_kcontrol *pKcontrol,
+	struct snd_ctl_elem_value *pValue)
+{
+#ifdef KCONTROL_CODEC
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
+#else
+	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
+#endif
+	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
+
+	pValue->value.integer.value[0] = ((pTAS2555->mnErrorCode & TAS2555_ERROR_FAILSAFE) != 0);
+	dev_dbg(pTAS2555->dev, "tas2555_fail_safe_get = 0x%x\n",
+		pTAS2555->mnErrorCode);
+
+	return 0;
+}
+
+static int tas2555_fail_safe_put(struct snd_kcontrol *pKcontrol,
+	struct snd_ctl_elem_value *pValue)
+{
+#ifdef KCONTROL_CODEC
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
+#else
+	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
+#endif
+	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
+	int nFailsafe = pValue->value.integer.value[0];
+
+	dev_dbg(pTAS2555->dev, "tas2555_fail_safe_put = %d\n",
+		nFailsafe);
+
+	if (nFailsafe == 1)
+		failsafe(pTAS2555);
+
+	return 0;
+}
+
+static int tas2555_DieTemp_DeltaT_get(struct snd_kcontrol *pKcontrol,
+	struct snd_ctl_elem_value *pValue)
+{
+#ifdef KCONTROL_CODEC
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
+#else
+	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
+#endif
+	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
+	int nResult = 0, nDeltaT;
+
+	nResult = tas2555_get_die_delta_temperature(pTAS2555, &nDeltaT);
+	if (nResult >= 0)
+		pValue->value.integer.value[0] = nDeltaT & 0x3ff;
+
+	dev_dbg(pTAS2555->dev, "tas2555_DieTemp_DeltaT_get = 0x%x\n",
+		nDeltaT);
+
+	return 0;
+}
+
+static int tas2555_DieTemp_DeltaT_put(struct snd_kcontrol *pKcontrol,
+	struct snd_ctl_elem_value *pValue)
+{
+#ifdef KCONTROL_CODEC
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
+#else
+	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
+#endif
+	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
+
+	dev_dbg(pTAS2555->dev, "tas2555_DieTemp_DeltaT_put = bypass\n");
+
+	return 0;
+}
+
 /*
  * DAC digital volumes. From 0 to 15 dB in 1 dB steps
  */
@@ -587,11 +688,15 @@ static const struct snd_kcontrol_new tas2555_snd_controls[] = {
 	SOC_SINGLE_EXT("nRe_Delta", SND_SOC_NOPM, 0, 0x7fffffff, 0,
 		tas2555_nReDelta_get, tas2555_nReDelta_put),
 	SOC_SINGLE_EXT("nRe", SND_SOC_NOPM, 0, 0x7fffffff, 0,
-		tas2555_nRe_get, NULL),
+		tas2555_nRe_get, tas2555_nRe_put),
 	SOC_SINGLE_EXT("TAS_Status", SND_SOC_NOPM, 0, 0x7fffffff, 0,
-		tas2555_errcode_get, NULL),
+		tas2555_errcode_get, tas2555_errcode_put),
 	SOC_SINGLE_EXT("Calibration", SND_SOC_NOPM, 0, 0x00FF, 0,
 		tas2555_calibration_get, tas2555_calibration_put),
+	SOC_SINGLE_EXT("FailSafe", SND_SOC_NOPM, 0, 0x0001, 0,
+		tas2555_fail_safe_get, tas2555_fail_safe_put),
+	SOC_SINGLE_EXT("DieTempDeltaT", SND_SOC_NOPM, 0, 0x03ff, 0,
+		tas2555_DieTemp_DeltaT_get, tas2555_DieTemp_DeltaT_put),
 };
 
 static struct snd_soc_codec_driver soc_codec_driver_tas2555 = {

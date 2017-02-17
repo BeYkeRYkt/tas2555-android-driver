@@ -47,6 +47,8 @@ typedef struct {
 	unsigned char mnLen;
 } TYCRC;
 
+void failsafe(struct tas2555_priv *pTAS2555);
+int tas2555_get_die_delta_temperature(struct tas2555_priv *pTAS2555, int *pDeltaT);
 int tas2555_enable(struct tas2555_priv *pTAS2555, bool bEnable);
 int tas2555_parse_dt(struct device *dev, struct tas2555_priv *pTAS2555);
 int tas2555_set_sampling_rate(struct tas2555_priv *pTAS2555, 

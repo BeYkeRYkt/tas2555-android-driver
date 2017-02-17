@@ -75,41 +75,15 @@ static int tas2555_load_configuration(struct tas2555_priv *pTAS2555,
 #define TAS2555_BLOCK_CONF_POST_POWER	0x06
 #define TAS2555_BLOCK_CONF_CAL		0x0A
 
-#if 0
 static unsigned int p_tas2555_default_data[] = {
-	TAS2555_ASI1_DAC_FORMAT_REG, 0x10,	//ASI1 DAC word length = 24 bits
-
-	TAS2555_PLL_CLKIN_REG, TAS2555_DEFAULT_PLL_CLKIN,	//PLL_CLKIN = GPIO1 (BCLK)
-	TAS2555_MAIN_CLKIN_REG, 0x0F,	//NDIV_MUX_CLKIN = PLL_CLK
-	TAS2555_PLL_P_VAL_REG, 0x01,	//PLL P = 1
-//  TAS2555_PLL_J_VAL_REG,      0x10, //PLL J = 16
-	TAS2555_PLL_J_VAL_REG, 0x30,	//PLL J = 48 -> PLL_CLK = 1.536MHz * 48 = 73.728MHz
-	TAS2555_PLL_D_VAL_MSB_REG, 0x00,	//PLL D = 0
-	TAS2555_PLL_D_VAL_LSB_REG, 0x00,
-	TAS2555_PLL_N_VAL_REG, 0x03,	//PLL N = 3 -> NDIV_CLK = 24.576MHz
-	TAS2555_DAC_MADC_VAL_REG, 0x08,	//MDAC = 8
-	TAS2555_CLK_MISC_REG, 0x20,	//DSP CLK = PLL out
-//  TAS2555_ISENSE_DIV_REG,     0x40, //Isense div and MADC final divider configure auto
-	TAS2555_ISENSE_DIV_REG, 0x00,	//Isense div and MADC final divider configure auto
-//  TAS2555_RAMP_CLK_DIV_LSB_REG,   0x20, //ramp_clk divider = 32 so that 12.288MHz/32 = 384KHz
-	TAS2555_RAMP_CLK_DIV_LSB_REG, 0x40,	//ramp_clk divider = 64 so that 24.576MHz/64 = 384KHz
-	TAS2555_DSP_MODE_SELECT_REG, 0x22,	//DSP ROM mode 2, default coeffs
-
-//  TAS2555_SPK_CTRL_REG,       0x74, //DAC channel gain
-	TAS2555_SPK_CTRL_REG, 0x7C,	//DAC channel gain
-//  TAS2555_POWER_CTRL2_REG,    0xA3, //power up
-//  TAS2555_POWER_CTRL1_REG,    0xF8, //power up
-//  TAS2555_MUTE_REG,       0x00, //unmute
-//  TAS2555_SOFT_MUTE_REG,      0x00, //soft unmute
-//  TAS2555_CLK_ERR_CTRL,       0x09, //enable clock error detection on PLL
+	TAS2555_SAR_ADC2_REG, 0x05,	/* enable SAR ADC */
+//	TAS2555_CLK_ERR_CTRL2, 0x11,	//enable clock error detection on PLL
+//	TAS2555_CLK_ERR_CTRL3, 0x11,	//enable clock error detection on PLL
 	0xFFFFFFFF, 0xFFFFFFFF
 };
-#endif
 
 static unsigned int p_tas2555_irq_config[] = {
 	/* TAS2555_GPIO4_PIN_REG, 0x07,	set GPIO4 as int1, default */
-//	TAS2555_CLK_ERR_CTRL2, 0x11,	//enable clock error detection on PLL
-//	TAS2555_CLK_ERR_CTRL3, 0x11,	//enable clock error detection on PLL
 	TAS2555_INT_GEN1_REG, 0x11,	/* enable spk OC and OV */
 	TAS2555_INT_GEN2_REG, 0x11,	/* enable clk err1 and die OT */
 	TAS2555_INT_GEN3_REG, 0x11,	/* enable clk err2 and brownout */
@@ -239,7 +213,7 @@ static int tas2555_dev_load_data(struct tas2555_priv *pTAS2555,
 	return ret;
 }
 
-static void failsafe(struct tas2555_priv *pTAS2555)
+void failsafe(struct tas2555_priv *pTAS2555)
 {
 	dev_err(pTAS2555->dev, "%s\n", __func__);
 	pTAS2555->mnErrorCode |= TAS2555_ERROR_FAILSAFE;
@@ -404,6 +378,27 @@ int tas2555_get_errcode(struct tas2555_priv *pTAS2555, unsigned int *pErrCode)
 	return nResult;
 }
 
+/*
+* die temperature calculation:
+* 	deltaT = (nT1 - nT2 ) / 2^10
+* 	DieTemp = (deltaT - 0.3459) / 0.001
+*/
+int tas2555_get_die_delta_temperature(struct tas2555_priv *pTAS2555, int *pDeltaT)
+{
+	unsigned char nBuf[4];
+	int nResult = 0;
+	unsigned int nT1 = 0, nT2 = 0;
+
+	nResult = pTAS2555->bulk_read(pTAS2555, TAS2555_SAR_T1MSB_REG, nBuf, 4);
+	if (nResult >= 0) {
+		nT1 = (unsigned int)nBuf[0] | (((unsigned int)nBuf[1] & 0xc0) << 2);
+		nT2 = (unsigned int)nBuf[2] | (((unsigned int)nBuf[3] & 0xc0) << 2);
+		*pDeltaT = nT1 - nT2;
+	}
+
+	return nResult;
+}
+
 int tas2555_configIRQ(struct tas2555_priv *pTAS2555)
 {
 	return tas2555_dev_load_data(pTAS2555, p_tas2555_irq_config);
@@ -411,17 +406,20 @@ int tas2555_configIRQ(struct tas2555_priv *pTAS2555)
 
 int tas2555_load_platdata(struct tas2555_priv *pTAS2555)
 {
-	int ret = 0;
+	int nResult = 0;
+
+	nResult = tas2555_dev_load_data(pTAS2555, p_tas2555_default_data);
+	if (nResult < 0)
+		goto end;
 
 	if (gpio_is_valid(pTAS2555->mnGpioINT)) {
-		ret = tas2555_configIRQ(pTAS2555);
-		if (ret < 0)
-			goto end;
-		ret = pTAS2555->enableIRQ(pTAS2555, false, true);
+		nResult = tas2555_configIRQ(pTAS2555);
+		if (nResult >= 0)
+			nResult = pTAS2555->enableIRQ(pTAS2555, false, true);
 	}
 
 end:
-	return ret;
+	return nResult;
 }
 
 int tas2555_load_default(struct tas2555_priv *pTAS2555)

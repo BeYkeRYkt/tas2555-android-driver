@@ -391,8 +391,8 @@ int tas2555_get_die_delta_temperature(struct tas2555_priv *pTAS2555, int *pDelta
 
 	nResult = pTAS2555->bulk_read(pTAS2555, TAS2555_SAR_T1MSB_REG, nBuf, 4);
 	if (nResult >= 0) {
-		nT1 = (unsigned int)nBuf[0] | (((unsigned int)nBuf[1] & 0xc0) << 2);
-		nT2 = (unsigned int)nBuf[2] | (((unsigned int)nBuf[3] & 0xc0) << 2);
+		nT1 = ((unsigned int)nBuf[0] << 2) | (((unsigned int)nBuf[1] & 0xc0) >> 6);
+		nT2 = ((unsigned int)nBuf[2] << 2) | (((unsigned int)nBuf[3] & 0xc0) >> 6);
 		*pDeltaT = nT1 - nT2;
 	}
 

@@ -42,10 +42,10 @@
 #define TAS2555_YRAM3_START_REG			8
 #define TAS2555_YRAM3_END_REG			55	/* Reg: 0x37 */
 
-typedef struct {
+struct TYCRC{
 	unsigned char mnOffset;
 	unsigned char mnLen;
-} TYCRC;
+};
 
 void failsafe(struct tas2555_priv *pTAS2555);
 int tas2555_get_die_delta_temperature(struct tas2555_priv *pTAS2555, int *pDeltaT);
@@ -63,6 +63,6 @@ int tas2555_set_calibration(struct tas2555_priv *pTAS2555,
 int tas2555_get_Re(struct tas2555_priv *pTAS2555, unsigned int *pRe);
 int tas2555_get_errcode(struct tas2555_priv *pTAS2555, unsigned int *pErrCode);
 int tas2555_load_default(struct tas2555_priv *pTAS2555);
-void tas2555_clear_firmware(TFirmware *pFirmware);
+void tas2555_clear_firmware(struct TFirmware *pFirmware);
 
 #endif /* _TAS2555_CORE_H */

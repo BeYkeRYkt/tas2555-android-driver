@@ -72,9 +72,9 @@
 #define TAS2555_CRC_RESET_REG			TAS2555_REG(0, 0, 33)
 #define TAS2555_DSP_MODE_SELECT_REG		TAS2555_REG(0, 0, 34)
 #define TAS2555_NONAME42_REG			TAS2555_REG(0, 0, 42)
-#define TAS2555_CLK_ERR_CTRL1			TAS2555_REG(0, 0, 44)
-#define TAS2555_CLK_ERR_CTRL2			TAS2555_REG(0, 0, 45)
-#define TAS2555_CLK_ERR_CTRL3			TAS2555_REG(0, 0, 46)
+#define TAS2555_CLK_ERR_CTRL1			TAS2555_REG(0, 0, 44)	/* B0_P0_R0x2c*/
+#define TAS2555_CLK_ERR_CTRL2			TAS2555_REG(0, 0, 45)	/* B0_P0_R0x2d*/
+#define TAS2555_CLK_ERR_CTRL3			TAS2555_REG(0, 0, 46)	/* B0_P0_R0x2e*/
 #define TAS2555_POWER_UP_FLAG_REG		TAS2555_REG(0, 0, 100)
 #define TAS2555_FLAGS_1				TAS2555_REG(0, 0, 104)	/* B0_P0_R0x68*/
 #define TAS2555_FLAGS_2				TAS2555_REG(0, 0, 108)	/* B0_P0_R0x6c*/
@@ -145,10 +145,9 @@
 #define TAS2555_ASIM_IFACE6_REG			TAS2555_REG(0, 1, 103)
 #define TAS2555_ASIM_IFACE7_REG			TAS2555_REG(0, 1, 104)
 #define TAS2555_ASIM_IFACE8_REG			TAS2555_REG(0, 1, 105)
-#define TAS2555_ASIM_IFACE9_REG			TAS2555_REG(0, 1, 106)
-
+#define TAS2555_CLK_HALT_REG			TAS2555_REG(0, 1, 106)	/* B0_P1_R0x6a */
 #define TAS2555_INT_GEN1_REG			TAS2555_REG(0, 1, 108)	/* B0_P1_R0x6c */
-#define TAS2555_INT_GEN2_REG			TAS2555_REG(0, 1, 109)
+#define TAS2555_INT_GEN2_REG			TAS2555_REG(0, 1, 109)	/* B0_P1_R0x6d */
 #define TAS2555_INT_GEN3_REG			TAS2555_REG(0, 1, 110)	/* B0_P1_R0x6e */
 #define TAS2555_INT_GEN4_REG			TAS2555_REG(0, 1, 111)	/* B0_P1_R0x6f */
 #define TAS2555_INT_MODE_REG			TAS2555_REG(0, 1, 114)	/* B0_P1_R0x72 */
@@ -165,8 +164,6 @@
 #define TAS2555_TEST_MODE_REG			TAS2555_REG(0, 253, 13)
 #define TAS2555_CRYPTIC_REG			TAS2555_REG(0, 253, 71)
 
-//#define TAS2555__REG      TAS2555_REG(0, 1, )
-//#define TAS2555__REG      TAS2555_REG(1, 0, )
 #define TAS2555_DAC_INTERPOL_REG		TAS2555_REG(100, 0, 1)
 #define TAS2555_SOFT_MUTE_REG			TAS2555_REG(100, 0, 7)
 #define TAS2555_PLL_P_VAL_REG			TAS2555_REG(100, 0, 27)
@@ -302,7 +299,7 @@
 #define TAS2555_ERROR_OVERCURRENT	0x20000000
 #define TAS2555_ERROR_FAILSAFE		0x40000000
 
-typedef struct {
+struct TBlock{
 	unsigned int mnType;
 	unsigned char mbPChkSumPresent;
 	unsigned char mnPChkSum;
@@ -310,46 +307,45 @@ typedef struct {
 	unsigned char mnYChkSum;
 	unsigned int mnCommands;
 	unsigned char *mpData;
-} TBlock;
+};
 
-typedef struct {
+struct TData{
 	char mpName[64];
 	char *mpDescription;
 	unsigned int mnBlocks;
-	TBlock *mpBlocks;
-} TData;
+	struct TBlock *mpBlocks;
+};
 
-typedef struct {
+struct TProgram{
 	char mpName[64];
 	char *mpDescription;
-	TData mData;
-} TProgram;
+	struct TData mData;
+};
 
-typedef struct {
+struct TPLL{
 	char mpName[64];
 	char *mpDescription;
-	TBlock mBlock;
-} TPLL;
+	struct TBlock mBlock;
+};
 
-typedef struct {
+struct TConfiguration{
 	char mpName[64];
 	char *mpDescription;
 	unsigned int mnProgram;
 	unsigned int mnPLL;
 	unsigned int mnSamplingRate;
-	TData mData;
-} TConfiguration;
+	struct TData mData;
+};
 
-typedef struct
-{
+struct TCalibration {
 	char mpName[64];
 	char *mpDescription;
 	unsigned int mnProgram;
 	unsigned int mnConfiguration;
-	TBlock mBlock;
-} TCalibration;
+	struct TBlock mBlock;
+};
 
-typedef struct {
+struct TFirmware {
 	unsigned int mnFWSize;
 	unsigned int mnChecksum;
 	unsigned int mnPPCVersion;
@@ -361,14 +357,14 @@ typedef struct {
 	unsigned int mnDeviceFamily;
 	unsigned int mnDevice;
 	unsigned int mnPLLs;
-	TPLL *mpPLLs;
+	struct TPLL *mpPLLs;
 	unsigned int mnPrograms;
-	TProgram *mpPrograms;
+	struct TProgram *mpPrograms;
 	unsigned int mnConfigurations;
-	TConfiguration *mpConfigurations;
+	struct TConfiguration *mpConfigurations;
 	unsigned int mnCalibrations;
-	TCalibration *mpCalibrations;
-} TFirmware;
+	struct TCalibration *mpCalibrations;
+};
 
 struct tas2555_register {
 	int book;
@@ -380,8 +376,8 @@ struct tas2555_priv {
 	struct device *dev;
 	struct regmap *mpRegmap;
 	struct mutex dev_lock;
-	TFirmware *mpFirmware;
-	TFirmware *mpCalFirmware;
+	struct TFirmware *mpFirmware;
+	struct TFirmware *mpCalFirmware;
 	unsigned int mnCurrentProgram;
 	unsigned int mnCurrentSampleRate;
 	unsigned int mnCurrentConfiguration;

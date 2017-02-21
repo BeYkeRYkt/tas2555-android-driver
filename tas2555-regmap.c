@@ -439,13 +439,13 @@ static int tas2555_i2c_probe(struct i2c_client *pClient,
 	udelay(1000);
 
 	pTAS2555->mpFirmware =
-		devm_kzalloc(&pClient->dev, sizeof(TFirmware),
+		devm_kzalloc(&pClient->dev, sizeof(struct TFirmware),
 		GFP_KERNEL);
 	if (!pTAS2555->mpFirmware)
 		return -ENOMEM;
 
 	pTAS2555->mpCalFirmware =
-		devm_kzalloc(&pClient->dev, sizeof(TFirmware),
+		devm_kzalloc(&pClient->dev, sizeof(struct TFirmware),
 		GFP_KERNEL);
 	if (!pTAS2555->mpCalFirmware)
 		return -ENOMEM;

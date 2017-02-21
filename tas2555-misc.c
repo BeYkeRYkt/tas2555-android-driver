@@ -172,11 +172,11 @@ static ssize_t tas2555_file_read(struct file *file, char *buf, size_t count, lof
 			if(count == PROGRAM_BUF_SIZE){
 				p_kBuf = (unsigned char *)kzalloc(count, GFP_KERNEL);
 				if(p_kBuf != NULL){
-					TProgram * pProgram = 
+					struct TProgram * pProgram = 
 						&(pTAS2555->mpFirmware->mpPrograms[pTAS2555->mnCurrentProgram]);
 					
-					p_kBuf[0] = pTAS2555->mpFirmware->mnPrograms;							
-					p_kBuf[1] = pTAS2555->mnCurrentProgram;					
+					p_kBuf[0] = pTAS2555->mpFirmware->mnPrograms;
+					p_kBuf[1] = pTAS2555->mnCurrentProgram;
 					memcpy(&p_kBuf[2], pProgram->mpName, FW_NAME_SIZE);
 					strcpy(&p_kBuf[2+FW_NAME_SIZE], pProgram->mpDescription);
 					
@@ -205,7 +205,7 @@ static ssize_t tas2555_file_read(struct file *file, char *buf, size_t count, lof
 			if(count == CONFIGURATION_BUF_SIZE){
 				p_kBuf = (unsigned char *)kzalloc(count, GFP_KERNEL);
 				if(p_kBuf != NULL){
-					TConfiguration * pConfiguration = 
+					struct TConfiguration * pConfiguration = 
 						&(pTAS2555->mpFirmware->mpConfigurations[pTAS2555->mnCurrentConfiguration]);
 
 					p_kBuf[0] = pTAS2555->mpFirmware->mnConfigurations;											
@@ -288,7 +288,7 @@ static ssize_t tas2555_file_read(struct file *file, char *buf, size_t count, lof
 			if(count == 4){
 				p_kBuf = (unsigned char *)kzalloc(count, GFP_KERNEL);
 				if(p_kBuf != NULL){				
-					TConfiguration *pConfiguration = 
+					struct TConfiguration *pConfiguration = 
 						&(pTAS2555->mpFirmware->mpConfigurations[pTAS2555->mnCurrentConfiguration]);
 
 					p_kBuf[0] = (pConfiguration->mnSamplingRate&0x000000ff);

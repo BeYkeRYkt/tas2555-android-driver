@@ -56,9 +56,9 @@
 
 static int tas2555_load_calibration(struct tas2555_priv *pTAS2555,
 	char *pFileName);
-static int tas2555_load_data(struct tas2555_priv *pTAS2555, TData * pData,
+static int tas2555_load_data(struct tas2555_priv *pTAS2555, struct TData *pData,
 	unsigned int nType);
-static int tas2555_load_block(struct tas2555_priv *pTAS2555, TBlock * pBlock);
+static int tas2555_load_block(struct tas2555_priv *pTAS2555, struct TBlock *pBlock);
 static int tas2555_load_configuration(struct tas2555_priv *pTAS2555,
 	unsigned int nConfiguration, bool bLoadSame);
 	
@@ -77,17 +77,18 @@ static int tas2555_load_configuration(struct tas2555_priv *pTAS2555,
 
 static unsigned int p_tas2555_default_data[] = {
 	TAS2555_SAR_ADC2_REG, 0x05,	/* enable SAR ADC */
-//	TAS2555_CLK_ERR_CTRL2, 0x11,	//enable clock error detection on PLL
-//	TAS2555_CLK_ERR_CTRL3, 0x11,	//enable clock error detection on PLL
+	TAS2555_CLK_ERR_CTRL2, 0x11,	//enable clock error detection on PLL
+	TAS2555_CLK_ERR_CTRL3, 0x11,	//enable clock error detection on PLL
 	0xFFFFFFFF, 0xFFFFFFFF
 };
 
 static unsigned int p_tas2555_irq_config[] = {
-	/* TAS2555_GPIO4_PIN_REG, 0x07,	set GPIO4 as int1, default */
+	TAS2555_CLK_HALT_REG, 0x71,
 	TAS2555_INT_GEN1_REG, 0x11,	/* enable spk OC and OV */
 	TAS2555_INT_GEN2_REG, 0x11,	/* enable clk err1 and die OT */
 	TAS2555_INT_GEN3_REG, 0x11,	/* enable clk err2 and brownout */
-	/* TAS2555_INT_GEN4_REG, 0x01,	disable SAR, enable clk halt */
+	TAS2555_INT_GEN4_REG, 0x01,	/* disable SAR, enable clk halt */
+	TAS2555_GPIO4_PIN_REG, 0x07,	/*set GPIO4 as int1, default */
 	TAS2555_INT_MODE_REG, 0x80,	/* active high until INT_STICKY_1 and INT_STICKY_2 are read to be cleared. */
 	0xFFFFFFFF, 0xFFFFFFFF
 };
@@ -121,13 +122,6 @@ static unsigned int p_tas2555_shutdown_data[] = {
 	TAS2555_POWER_CTRL1_REG, 0x00,	//all power down
 	0xFFFFFFFF, 0xFFFFFFFF
 };
-
-#if 0
-static unsigned int p_tas2555_shutdown_clk_err[] = {
-	TAS2555_CLK_ERR_CTRL, 0x09,	//enable clock error detection on PLL
-	0xFFFFFFFF, 0xFFFFFFFF
-};
-#endif
 
 static unsigned int p_tas2555_mute_DSP_down_data[] = {
 	TAS2555_CLK_ERR_CTRL1, 0x00,	//disable clock error detection
@@ -444,7 +438,7 @@ int tas2555_enable(struct tas2555_priv *pTAS2555, bool bEnable)
 
 	if (bEnable) {
 		if (!pTAS2555->mbPowerUp) {
-			TConfiguration *pConfiguration;
+			struct TConfiguration *pConfiguration;
 
 			if (!pTAS2555->mbCalibrationLoaded) {
 				tas2555_load_calibration(pTAS2555, TAS2555_CAL_NAME);
@@ -505,7 +499,6 @@ int tas2555_enable(struct tas2555_priv *pTAS2555, bool bEnable)
 		if (pTAS2555->mbPowerUp) {
 			dev_dbg(pTAS2555->dev, "Enable: load shutdown sequence\n");
 			nResult = tas2555_dev_load_data(pTAS2555, p_tas2555_shutdown_data);
-			//tas2555_dev_load_data(pTAS2555, p_tas2555_shutdown_clk_err);
 			pTAS2555->mbPowerUp = false;
 		}
 	}
@@ -519,7 +512,7 @@ end:
 
 int tas2555_set_sampling_rate(struct tas2555_priv *pTAS2555, unsigned int nSamplingRate)
 {
-	TConfiguration *pConfiguration;
+	struct TConfiguration *pConfiguration;
 	unsigned int nConfiguration;
 
 	dev_dbg(pTAS2555->dev, "tas2555_setup_clocks: nSamplingRate = %d [Hz]\n",
@@ -558,14 +551,14 @@ int tas2555_set_sampling_rate(struct tas2555_priv *pTAS2555, unsigned int nSampl
 	return -EINVAL;
 }
 
-static void fw_print_header(struct tas2555_priv *pTAS2555, TFirmware * pFirmware)
+static void fw_print_header(struct tas2555_priv *pTAS2555, struct TFirmware * pFirmware)
 {
 	dev_info(pTAS2555->dev, "FW Size        = %d", pFirmware->mnFWSize);
 	dev_info(pTAS2555->dev, "Checksum       = 0x%04X", pFirmware->mnChecksum);
 	dev_info(pTAS2555->dev, "PPC Version    = 0x%04X", pFirmware->mnPPCVersion);
 	dev_info(pTAS2555->dev, "FW  Version    = 0x%04X", pFirmware->mnFWVersion);
 	if(pFirmware->mnPPCVersion >= PPC_WITH_DRIVER_VERSION)
-	dev_info(pTAS2555->dev, "Driver Version = 0x%04X", pFirmware->mnDriverVersion);
+		dev_info(pTAS2555->dev, "Driver Version = 0x%04X", pFirmware->mnDriverVersion);
 	dev_info(pTAS2555->dev, "Timestamp      = %d", pFirmware->mnTimeStamp);
 	dev_info(pTAS2555->dev, "DDC Name       = %s", pFirmware->mpDDCName);
 	dev_info(pTAS2555->dev, "Description    = %s", pFirmware->mpDescription);
@@ -577,7 +570,7 @@ inline unsigned int fw_convert_number(unsigned char *pData)
 }
 
 static int fw_parse_header(struct tas2555_priv *pTAS2555, 
-	TFirmware * pFirmware, unsigned char *pData,
+	struct TFirmware * pFirmware, unsigned char *pData,
 	unsigned int nSize)
 {
 	unsigned char *pDataStart = pData;
@@ -607,11 +600,11 @@ static int fw_parse_header(struct tas2555_priv *pTAS2555,
 	pFirmware->mnFWVersion = fw_convert_number(pData);
 	pData += 4;
 
-	if(pFirmware->mnPPCVersion >= PPC_WITH_DRIVER_VERSION){
+	if (pFirmware->mnPPCVersion >= PPC_WITH_DRIVER_VERSION) {
 		pFirmware->mnDriverVersion = fw_convert_number(pData);
-		pData += 4;		
+		pData += 4;
 	}
-			
+
 	pFirmware->mnTimeStamp = fw_convert_number(pData);
 	pData += 4;
 
@@ -638,29 +631,28 @@ static int fw_parse_header(struct tas2555_priv *pTAS2555,
 	return pData - pDataStart;
 }
 
-static int fw_parse_block_data(struct tas2555_priv *pTAS2555,
-	TBlock * pBlock, unsigned char *pData)
+static int fw_parse_block_data(struct tas2555_priv *pTAS2555, struct TFirmware *pFirmware,
+	struct TBlock * pBlock, unsigned char *pData)
 {
 	unsigned char *pDataStart = pData;
 	unsigned int n;
 
 	pBlock->mnType = fw_convert_number(pData);
 	pData += 4;
-	
-	if(pTAS2555->mpFirmware->mnDriverVersion 
-		>= PPC_DRIVER_VERSION){
+
+	if (pFirmware->mnDriverVersion >= PPC_DRIVER_VERSION) {
 		pBlock->mbPChkSumPresent = pData[0];
 		pData++;
-		
+
 		pBlock->mnPChkSum = pData[0];
 		pData++;
-		
+
 		pBlock->mbYChkSumPresent = pData[0];
 		pData++;
-		
+
 		pBlock->mnYChkSum = pData[0];
 		pData++;
-	}else{
+	} else {
 		pBlock->mbPChkSumPresent = 0;
 		pBlock->mbYChkSumPresent = 0;
 	}
@@ -675,8 +667,8 @@ static int fw_parse_block_data(struct tas2555_priv *pTAS2555,
 	return pData - pDataStart;
 }
 
-static int fw_parse_data(struct tas2555_priv *pTAS2555,
-	TData * pImageData, unsigned char *pData)
+static int fw_parse_data(struct tas2555_priv *pTAS2555, struct TFirmware *pFirmware,
+	struct TData *pImageData, unsigned char *pData)
 {
 	unsigned char *pDataStart = pData;
 	unsigned int nBlock;
@@ -693,10 +685,10 @@ static int fw_parse_data(struct tas2555_priv *pTAS2555,
 	pData += 2;
 
 	pImageData->mpBlocks =
-		kmalloc(sizeof(TBlock) * pImageData->mnBlocks, GFP_KERNEL);
+		kmalloc(sizeof(struct TBlock) * pImageData->mnBlocks, GFP_KERNEL);
 
 	for (nBlock = 0; nBlock < pImageData->mnBlocks; nBlock++) {
-		n = fw_parse_block_data(pTAS2555, &(pImageData->mpBlocks[nBlock]), pData);
+		n = fw_parse_block_data(pTAS2555, pFirmware, &(pImageData->mpBlocks[nBlock]), pData);
 		pData += n;
 	}
 
@@ -704,17 +696,20 @@ static int fw_parse_data(struct tas2555_priv *pTAS2555,
 }
 
 static int fw_parse_pll_data(struct tas2555_priv *pTAS2555,
-	TFirmware * pFirmware, unsigned char *pData)
+	struct TFirmware *pFirmware, unsigned char *pData)
 {
 	unsigned char *pDataStart = pData;
 	unsigned int n;
 	unsigned int nPLL;
-	TPLL *pPLL;
+	struct TPLL *pPLL;
 
 	pFirmware->mnPLLs = (pData[0] << 8) + pData[1];
 	pData += 2;
 
-	pFirmware->mpPLLs = kmalloc(sizeof(TPLL) * pFirmware->mnPLLs, GFP_KERNEL);
+	if (pFirmware->mnPLLs == 0)
+		goto end;
+
+	pFirmware->mpPLLs = kmalloc(sizeof(struct TPLL) * pFirmware->mnPLLs, GFP_KERNEL);
 	for (nPLL = 0; nPLL < pFirmware->mnPLLs; nPLL++) {
 		pPLL = &(pFirmware->mpPLLs[nPLL]);
 
@@ -725,26 +720,31 @@ static int fw_parse_pll_data(struct tas2555_priv *pTAS2555,
 		pPLL->mpDescription = kmemdup(pData, n + 1, GFP_KERNEL);
 		pData += n + 1;
 
-		n = fw_parse_block_data(pTAS2555, &(pPLL->mBlock), pData);
+		n = fw_parse_block_data(pTAS2555, pFirmware, &(pPLL->mBlock), pData);
 		pData += n;
 	}
+
+end:
 
 	return pData - pDataStart;
 }
 
 static int fw_parse_program_data(struct tas2555_priv *pTAS2555,
-	TFirmware * pFirmware, unsigned char *pData)
+	struct TFirmware *pFirmware, unsigned char *pData)
 {
 	unsigned char *pDataStart = pData;
 	unsigned int n;
 	unsigned int nProgram;
-	TProgram *pProgram;
+	struct TProgram *pProgram;
 
 	pFirmware->mnPrograms = (pData[0] << 8) + pData[1];
 	pData += 2;
 
+	if (pFirmware->mnPrograms == 0)
+		goto end;
+
 	pFirmware->mpPrograms =
-		kmalloc(sizeof(TProgram) * pFirmware->mnPrograms, GFP_KERNEL);
+		kmalloc(sizeof(struct TProgram) * pFirmware->mnPrograms, GFP_KERNEL);
 	for (nProgram = 0; nProgram < pFirmware->mnPrograms; nProgram++) {
 		pProgram = &(pFirmware->mpPrograms[nProgram]);
 		memcpy(pProgram->mpName, pData, 64);
@@ -754,26 +754,31 @@ static int fw_parse_program_data(struct tas2555_priv *pTAS2555,
 		pProgram->mpDescription = kmemdup(pData, n + 1, GFP_KERNEL);
 		pData += n + 1;
 
-		n = fw_parse_data(pTAS2555, &(pProgram->mData), pData);
+		n = fw_parse_data(pTAS2555, pFirmware, &(pProgram->mData), pData);
 		pData += n;
 	}
+
+end:
 
 	return pData - pDataStart;
 }
 
 static int fw_parse_configuration_data(struct tas2555_priv *pTAS2555,
-	TFirmware * pFirmware,	unsigned char *pData)
+	struct TFirmware *pFirmware, unsigned char *pData)
 {
 	unsigned char *pDataStart = pData;
 	unsigned int n;
 	unsigned int nConfiguration;
-	TConfiguration *pConfiguration;
+	struct TConfiguration *pConfiguration;
 
 	pFirmware->mnConfigurations = (pData[0] << 8) + pData[1];
 	pData += 2;
 
+	if (pFirmware->mnConfigurations == 0)
+		goto end;
+
 	pFirmware->mpConfigurations =
-		kmalloc(sizeof(TConfiguration) * pFirmware->mnConfigurations,
+		kmalloc(sizeof(struct TConfiguration) * pFirmware->mnConfigurations,
 		GFP_KERNEL);
 	for (nConfiguration = 0; nConfiguration < pFirmware->mnConfigurations;
 		nConfiguration++) {
@@ -794,26 +799,31 @@ static int fw_parse_configuration_data(struct tas2555_priv *pTAS2555,
 		pConfiguration->mnSamplingRate = fw_convert_number(pData);
 		pData += 4;
 
-		n = fw_parse_data(pTAS2555, &(pConfiguration->mData), pData);
+		n = fw_parse_data(pTAS2555, pFirmware, &(pConfiguration->mData), pData);
 		pData += n;
 	}
+
+end:
 
 	return pData - pDataStart;
 }
 
 int fw_parse_calibration_data(struct tas2555_priv *pTAS2555,
-	TFirmware * pFirmware, unsigned char *pData)
+	struct TFirmware *pFirmware, unsigned char *pData)
 {
 	unsigned char *pDataStart = pData;
 	unsigned int n;
 	unsigned int nCalibration;
-	TCalibration *pCalibration;
+	struct TCalibration *pCalibration;
 
 	pFirmware->mnCalibrations = (pData[0] << 8) + pData[1];
 	pData += 2;
 
+	if (pFirmware->mnCalibrations == 0)
+		goto end;
+
 	pFirmware->mpCalibrations =
-		kmalloc(sizeof(TCalibration) * pFirmware->mnCalibrations, GFP_KERNEL);
+		kmalloc(sizeof(struct TCalibration) * pFirmware->mnCalibrations, GFP_KERNEL);
 	for (nCalibration = 0;
 		nCalibration < pFirmware->mnCalibrations;
 		nCalibration++) {
@@ -831,15 +841,17 @@ int fw_parse_calibration_data(struct tas2555_priv *pTAS2555,
 		pCalibration->mnConfiguration = pData[0];
 		pData++;
 
-		n = fw_parse_block_data(pTAS2555, &(pCalibration->mBlock), pData);
+		n = fw_parse_block_data(pTAS2555, pFirmware, &(pCalibration->mBlock), pData);
 		pData += n;
 	}
+
+end:
 
 	return pData - pDataStart;
 }
 
 static int fw_parse(struct tas2555_priv *pTAS2555,
-	TFirmware * pFirmware,
+	struct TFirmware * pFirmware,
 	unsigned char *pData,
 	unsigned int nSize)
 {
@@ -903,7 +915,7 @@ static const unsigned char crc8_lookup_table[CRC8_TABLE_SIZE] = {
 0xF4, 0xB9, 0x6E, 0x23, 0x8D, 0xC0, 0x17, 0x5A, 0x06, 0x4B, 0x9C, 0xD1, 0x7F, 0x32, 0xE5, 0xA8 
 };
 
-static int isYRAM(struct tas2555_priv *pTAS2555, TYCRC *pCRCData, 
+static int isYRAM(struct tas2555_priv *pTAS2555, struct TYCRC *pCRCData, 
 	unsigned char nBook, unsigned char nPage, unsigned char nReg, unsigned char len)
 {
 	int result = -1;
@@ -970,7 +982,7 @@ static int isYRAM(struct tas2555_priv *pTAS2555, TYCRC *pCRCData,
 					result = 0;
 			}else
 				result = 0;
-		} else if(nPage == TAS2555_YRAM3_PAGE) {
+		} else if (nPage == TAS2555_YRAM3_PAGE) {
 			if (nReg > TAS2555_YRAM2_END_REG) {
 				dev_err(pTAS2555->dev, "nReg 0x%x, len %d error\n", nReg, len);
 				pTAS2555->mnErrorCode |= TAS2555_ERROR_FWFORMAT;
@@ -983,7 +995,7 @@ static int isYRAM(struct tas2555_priv *pTAS2555, TYCRC *pCRCData,
 						pCRCData->mnLen = len;
 					}
 					result = 1;
-				} else if((nReg + len -1) <= TAS2555_YRAM2_END_REG) {
+				} else if ((nReg + len -1) <= TAS2555_YRAM2_END_REG) {
 					if (pCRCData != NULL) {
 						pCRCData->mnOffset = nReg;
 						pCRCData->mnLen = TAS2555_YRAM3_END_REG - nReg + 1;
@@ -1004,7 +1016,7 @@ static int isYRAM(struct tas2555_priv *pTAS2555, TYCRC *pCRCData,
 							pCRCData->mnLen = nReg + len - TAS2555_YRAM3_START_REG;
 						}
 						result = 1;
-					} else if((nReg + len -1) <= TAS2555_YRAM2_END_REG) {
+					} else if ((nReg + len -1) <= TAS2555_YRAM2_END_REG) {
 						if (pCRCData != NULL) {
 							pCRCData->mnOffset = TAS2555_YRAM3_START_REG;
 							pCRCData->mnLen = TAS2555_YRAM3_END_REG - TAS2555_YRAM3_START_REG + 1;
@@ -1083,7 +1095,7 @@ static int doMultiRegCheckSum(struct tas2555_priv *pTAS2555,
 	int nResult = -1, i;
 	unsigned char nCRCChkSum = 0;
 	unsigned char nBuf[127];
-	TYCRC TCRCData;
+	struct TYCRC TCRCData;
 
 	if ((nReg + len-1) > 127) {
 		dev_err(pTAS2555->dev, "firmware error\n");
@@ -1118,7 +1130,7 @@ err:
 	return nResult;
 }
 
-static int tas2555_load_block(struct tas2555_priv *pTAS2555, TBlock * pBlock)
+static int tas2555_load_block(struct tas2555_priv *pTAS2555, struct TBlock * pBlock)
 {
 	int nResult = 0;
 	int nRetry = 6;
@@ -1252,12 +1264,12 @@ end:
 	return nResult;
 }
 
-static int tas2555_load_data(struct tas2555_priv *pTAS2555, TData * pData,
+static int tas2555_load_data(struct tas2555_priv *pTAS2555, struct TData * pData,
 	unsigned int nType)
 {
 	unsigned int nBlock;
 	int nResult = 0;
-	TBlock *pBlock;
+	struct TBlock *pBlock;
 
 	dev_dbg(pTAS2555->dev,
 		"TAS2555 load data: %s, Blocks = %d, Block Type = %d\n", pData->mpName,
@@ -1279,9 +1291,9 @@ static int tas2555_load_configuration(struct tas2555_priv *pTAS2555,
 	unsigned int nConfiguration, bool bLoadSame)
 {
 	int nResult = 0;
-	TConfiguration *pCurrentConfiguration;
-	TConfiguration *pNewConfiguration;
-	TPLL *pNewPLL;
+	struct TConfiguration *pCurrentConfiguration;
+	struct TConfiguration *pNewConfiguration;
+	struct TPLL *pNewPLL;
 
 	dev_dbg(pTAS2555->dev, "tas2555_load_configuration: %d\n", nConfiguration);
 
@@ -1439,8 +1451,8 @@ end:
 
 int tas2555_set_config(struct tas2555_priv *pTAS2555, int config)
 {
-	TConfiguration *pConfiguration;
-	TProgram *pProgram;
+	struct TConfiguration *pConfiguration;
+	struct TProgram *pProgram;
 	unsigned int nProgram = pTAS2555->mnCurrentProgram;
 	unsigned int nConfiguration = config;
 
@@ -1475,47 +1487,51 @@ int tas2555_set_config(struct tas2555_priv *pTAS2555, int config)
 	return 0;
 }
 
-void tas2555_clear_firmware(TFirmware *pFirmware)
+void tas2555_clear_firmware(struct TFirmware *pFirmware)
 {
 	unsigned int n, nn;
 	if (!pFirmware) return;
 	if (pFirmware->mpDescription) kfree(pFirmware->mpDescription);
 
-	for (n = 0; n < pFirmware->mnPLLs; n++)
-	{
-		kfree(pFirmware->mpPLLs[n].mpDescription);
-		kfree(pFirmware->mpPLLs[n].mBlock.mpData);
+	if (pFirmware->mnPLLs) {
+		for (n = 0; n < pFirmware->mnPLLs; n++) {
+			kfree(pFirmware->mpPLLs[n].mpDescription);
+			kfree(pFirmware->mpPLLs[n].mBlock.mpData);
+		}
+		kfree(pFirmware->mpPLLs);
 	}
-	kfree(pFirmware->mpPLLs);
 
-	for (n = 0; n < pFirmware->mnPrograms; n++)
-	{
-		kfree(pFirmware->mpPrograms[n].mpDescription);
-		kfree(pFirmware->mpPrograms[n].mData.mpDescription);
-		for (nn = 0; nn < pFirmware->mpPrograms[n].mData.mnBlocks; nn++)
-			kfree(pFirmware->mpPrograms[n].mData.mpBlocks[nn].mpData);
-		kfree(pFirmware->mpPrograms[n].mData.mpBlocks);
+	if (pFirmware->mnPrograms) {
+		for (n = 0; n < pFirmware->mnPrograms; n++) {
+			kfree(pFirmware->mpPrograms[n].mpDescription);
+			kfree(pFirmware->mpPrograms[n].mData.mpDescription);
+			for (nn = 0; nn < pFirmware->mpPrograms[n].mData.mnBlocks; nn++)
+				kfree(pFirmware->mpPrograms[n].mData.mpBlocks[nn].mpData);
+			kfree(pFirmware->mpPrograms[n].mData.mpBlocks);
+		}
+		kfree(pFirmware->mpPrograms);
 	}
-	kfree(pFirmware->mpPrograms);
 
-	for (n = 0; n < pFirmware->mnConfigurations; n++)
-	{
-		kfree(pFirmware->mpConfigurations[n].mpDescription);
-		kfree(pFirmware->mpConfigurations[n].mData.mpDescription);
-		for (nn = 0; nn < pFirmware->mpConfigurations[n].mData.mnBlocks; nn++)
-			kfree(pFirmware->mpConfigurations[n].mData.mpBlocks[nn].mpData);
-		kfree(pFirmware->mpConfigurations[n].mData.mpBlocks);
+	if (pFirmware->mnConfigurations) {
+		for (n = 0; n < pFirmware->mnConfigurations; n++) {
+			kfree(pFirmware->mpConfigurations[n].mpDescription);
+			kfree(pFirmware->mpConfigurations[n].mData.mpDescription);
+			for (nn = 0; nn < pFirmware->mpConfigurations[n].mData.mnBlocks; nn++)
+				kfree(pFirmware->mpConfigurations[n].mData.mpBlocks[nn].mpData);
+			kfree(pFirmware->mpConfigurations[n].mData.mpBlocks);
+		}
+		kfree(pFirmware->mpConfigurations);
 	}
-	kfree(pFirmware->mpConfigurations);
 
-	for (n = 0; n < pFirmware->mnCalibrations; n++)
-	{
-		kfree(pFirmware->mpCalibrations[n].mpDescription);
-		kfree(pFirmware->mpCalibrations[n].mBlock.mpData);
+	if (pFirmware->mnCalibrations) {
+		for (n = 0; n < pFirmware->mnCalibrations; n++) {
+			kfree(pFirmware->mpCalibrations[n].mpDescription);
+			kfree(pFirmware->mpCalibrations[n].mBlock.mpData);
+		}
+		kfree(pFirmware->mpCalibrations);
 	}
-	kfree(pFirmware->mpCalibrations);
 
-	memset(pFirmware, 0x00, sizeof(TFirmware));
+	memset(pFirmware, 0x00, sizeof(struct TFirmware));
 }
 
 static int tas2555_load_calibration(struct tas2555_priv *pTAS2555,
@@ -1625,8 +1641,8 @@ void tas2555_fw_ready(const struct firmware *pFW, void *pContext)
 
 int tas2555_set_program(struct tas2555_priv *pTAS2555, unsigned int nProgram, int nConfig)
 {
-	TPLL *pPLL;
-	TConfiguration *pConfiguration;
+	struct TPLL *pPLL;
+	struct TConfiguration *pConfiguration;
 	unsigned int nConfiguration = 0;
 	unsigned int nSampleRate = 0;
 	unsigned int Value = 0;
@@ -1655,17 +1671,17 @@ int tas2555_set_program(struct tas2555_priv *pTAS2555, unsigned int nProgram, in
 			&& (nConfiguration < pTAS2555->mpFirmware->mnConfigurations)) {
 			if (pTAS2555->mpFirmware->mpConfigurations[nConfiguration].mnProgram 
 				== nProgram){
-				if(nSampleRate == 0){
+				if (nSampleRate == 0){
 					bFound = true;
 					dev_info(pTAS2555->dev, "find default configuration %d\n", nConfiguration);
-				}else if(nSampleRate 
+				} else if (nSampleRate 
 					== pTAS2555->mpFirmware->mpConfigurations[nConfiguration].mnSamplingRate){
 					bFound = true;
 					dev_info(pTAS2555->dev, "find matching configuration %d\n", nConfiguration);
-				}else{
+				} else {
 					nConfiguration++;
 				}
-			}else{
+			} else {
 				nConfiguration++;
 			}
 		}

@@ -1586,6 +1586,7 @@ void tas2555_fw_ready(const struct firmware *pFW, void *pContext)
 	struct tas2555_priv *pTAS2555 = (struct tas2555_priv *) pContext;
 	int nResult;
 	unsigned int nProgram = 0;
+	int nConfiguration = 0;
 	unsigned int nSampleRate = 0;
 
 	dev_info(pTAS2555->dev, "%s:\n", __func__);
@@ -1593,17 +1594,18 @@ void tas2555_fw_ready(const struct firmware *pFW, void *pContext)
 	if (unlikely(!pFW) || unlikely(!pFW->data)) {
 		dev_err(pTAS2555->dev, "%s firmware is not loaded\n", TAS2555_FW_NAME);
 		pTAS2555->mnErrorCode |= TAS2555_ERROR_FWNOTLOAD;
-		nResult = tas2555_load_default(pTAS2555);
 		return;
 	}
 
-	if (pTAS2555->mpFirmware->mpConfigurations){
-		nProgram = pTAS2555->mnCurrentProgram;
-		nSampleRate = pTAS2555->mnCurrentSampleRate;
+	nProgram = pTAS2555->mnCurrentProgram;
+	nSampleRate = pTAS2555->mnCurrentSampleRate;
+	nConfiguration = pTAS2555->mnCurrentConfiguration;
+
+	if (pTAS2555->mpFirmware->mpConfigurations) {
 		dev_dbg(pTAS2555->dev, "clear current firmware\n");
 		tas2555_clear_firmware(pTAS2555->mpFirmware);
-	}	
-		
+	}
+	
 	nResult = fw_parse(pTAS2555, pTAS2555->mpFirmware, 
 		(unsigned char *) (pFW->data), pFW->size);
 
@@ -1628,15 +1630,29 @@ void tas2555_fw_ready(const struct firmware *pFW, void *pContext)
 		return;
 	}
 
-	if(nProgram >= pTAS2555->mpFirmware->mnPrograms){
+	if (nProgram >= pTAS2555->mpFirmware->mnPrograms) {
 		dev_info(pTAS2555->dev, 
 			"no previous program, set to default\n");
 		nProgram = 0;
 	}
 
-	pTAS2555->mnCurrentSampleRate = nSampleRate;
+	if (nConfiguration >= pTAS2555->mpFirmware->mnConfigurations) {
+		dev_info(pTAS2555->dev, 
+			"no previous program, set to default\n");
+		nConfiguration = -1;
+	}
 
-	tas2555_set_program(pTAS2555, nProgram, -1);
+	if (nConfiguration >= 0) {
+		if (pTAS2555->mpFirmware->mpConfigurations[nConfiguration].mnProgram != nProgram)
+			nConfiguration = -1;
+	}
+
+	if (nConfiguration >= 0) {
+		if (pTAS2555->mpFirmware->mpConfigurations[nConfiguration].mnSamplingRate != nSampleRate)
+			nConfiguration = -1;
+	}
+
+	tas2555_set_program(pTAS2555, nProgram, nConfiguration);
 }
 
 int tas2555_set_program(struct tas2555_priv *pTAS2555, unsigned int nProgram, int nConfig)

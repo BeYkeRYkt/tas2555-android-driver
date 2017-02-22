@@ -665,6 +665,48 @@ static int tas2555_DieTemp_DeltaT_put(struct snd_kcontrol *pKcontrol,
 	return 0;
 }
 
+static int tas2555_fw_load_get(struct snd_kcontrol *pKcontrol,
+	struct snd_ctl_elem_value *pValue)
+{
+#ifdef KCONTROL_CODEC
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
+#else
+	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
+#endif
+	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
+	int nResult = 0;
+
+	if ((pTAS2555->mpFirmware->mnConfigurations > 0)
+		&& (pTAS2555->mpFirmware->mnPrograms > 0))
+		nResult = 1;
+
+	pValue->value.integer.value[0] = nResult;
+
+	dev_dbg(pTAS2555->dev, "%s = 0x%x\n", __func__, nResult);
+
+	return 0;
+}
+
+static int tas2555_fw_load_put(struct snd_kcontrol *pKcontrol,
+	struct snd_ctl_elem_value *pValue)
+{
+#ifdef KCONTROL_CODEC
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
+#else
+	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
+#endif
+	struct tas2555_priv *pTAS2555 = snd_soc_codec_get_drvdata(codec);
+	int nReload = pValue->value.integer.value[0];
+
+	if (nReload)
+		request_firmware_nowait(THIS_MODULE, 1, TAS2555_FW_NAME,
+			pTAS2555->dev, GFP_KERNEL, pTAS2555, tas2555_fw_ready);
+
+	dev_dbg(pTAS2555->dev, "%s, %d\n", __func__, nReload);
+
+	return 0;
+}
+
 /*
  * DAC digital volumes. From 0 to 15 dB in 1 dB steps
  */
@@ -683,6 +725,8 @@ static const struct snd_kcontrol_new tas2555_snd_controls[] = {
 		tas2555_program_put),
 	SOC_SINGLE_EXT("Configuration", SND_SOC_NOPM, 0, 0x00FF, 0,
 		tas2555_configuration_get, tas2555_configuration_put),
+	SOC_SINGLE_EXT("TAS_FWLoad", SND_SOC_NOPM, 0, 0x0001, 0,
+		tas2555_fw_load_get, tas2555_fw_load_put),
 	SOC_SINGLE_EXT("FS", SND_SOC_NOPM, 8000, 48000, 0,
 		tas2555_fs_get, tas2555_fs_put),
 	SOC_SINGLE_EXT("nRe_Delta", SND_SOC_NOPM, 0, 0x7fffffff, 0,

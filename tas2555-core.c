@@ -225,7 +225,7 @@ void failsafe(struct tas2555_priv *pTAS2555)
 
 #define Q_FACTOR 0x08000000
 
-static bool chkReBoundary(struct tas2555_priv *pTAS2555, 
+static bool chkReDeltaBoundary(struct tas2555_priv *pTAS2555, 
 	unsigned int ReOrginal, unsigned int ReDelta, unsigned int Re, unsigned char scale, unsigned int *pActRe)
 {
 	bool nResult = false;
@@ -251,11 +251,11 @@ static bool chkReBoundary(struct tas2555_priv *pTAS2555,
 
 	case 1:
 	/* 6Ohm speaker */
-		ReDelta = (ReDelta * 4) / 3;
+		ReDelta = (ReDelta / 3) * 4;
 		ReHigh_calc = ReOrginal + ReDelta;
 		ReLow_calc = ReOrginal - ReDelta;
 		Re_calc = Re;
-		*pActRe = (Re_calc * 3) / 4;
+		*pActRe = (Re_calc / 4) * 3;
 		break;
 
 	case 2:
@@ -329,7 +329,7 @@ int tas2555_get_Re(struct tas2555_priv *pTAS2555, unsigned int *pRe)
 		}
 
 		nValue = (nValue & 0x06) >> 1;
-		if (chkReBoundary(pTAS2555, 
+		if (chkReDeltaBoundary(pTAS2555, 
 			pTAS2555->mnReOrignal, pTAS2555->mnReDelta, nRe, nValue, pRe))
 			failsafe(pTAS2555);
 	} else {

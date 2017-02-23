@@ -427,6 +427,8 @@ int tas2555_load_default(struct tas2555_priv *pTAS2555)
 int tas2555_enable(struct tas2555_priv *pTAS2555, bool bEnable)
 {
 	int nResult = 0;
+	unsigned int nValue = 0;
+	struct TConfiguration *pConfiguration;
 
 	dev_dbg(pTAS2555->dev, "Enable: %d\n", bEnable);
 
@@ -438,7 +440,18 @@ int tas2555_enable(struct tas2555_priv *pTAS2555, bool bEnable)
 
 	if (bEnable) {
 		if (!pTAS2555->mbPowerUp) {
-			struct TConfiguration *pConfiguration;
+			nResult = pTAS2555->read(pTAS2555, TAS2555_DSP_MODE_SELECT_REG, &nValue);
+			if (nResult < 0)
+				goto end;
+
+			if (pTAS2555->mnCurrentProgram == 0) {
+				/* smart-amp mode */
+				if ((nValue & 0x03) != 0) {
+					/* unexpected error happens */
+					nResult = -1;
+					goto end;
+				}
+			}
 
 			if (!pTAS2555->mbCalibrationLoaded) {
 				tas2555_load_calibration(pTAS2555, TAS2555_CAL_NAME);

@@ -42,6 +42,8 @@
 #define TAS2555_YRAM3_START_REG			8
 #define TAS2555_YRAM3_END_REG			55	/* Reg: 0x37 */
 
+#define TAS2555_SAFE_GUARD_PATTERN	0x5a
+
 struct TYCRC{
 	unsigned char mnOffset;
 	unsigned char mnLen;

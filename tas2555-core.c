@@ -77,8 +77,9 @@ static int tas2555_load_configuration(struct tas2555_priv *pTAS2555,
 
 static unsigned int p_tas2555_default_data[] = {
 	TAS2555_SAR_ADC2_REG, 0x05,	/* enable SAR ADC */
-	TAS2555_CLK_ERR_CTRL2, 0x11,	//enable clock error detection on PLL
+	TAS2555_CLK_ERR_CTRL2, 0x39,	//enable clock error detection on PLL
 	TAS2555_CLK_ERR_CTRL3, 0x11,	//enable clock error detection on PLL
+	TAS2555_SAFE_GUARD_REG, TAS2555_SAFE_GUARD_PATTERN,	//safe guard
 	0xFFFFFFFF, 0xFFFFFFFF
 };
 
@@ -101,6 +102,11 @@ static unsigned int p_tas2555_startup_data[] = {
 	TAS2555_POWER_CTRL2_REG, 0xA3,	//Class-D, Boost, IV sense power up
 	TAS2555_POWER_CTRL1_REG, 0xF8,	//PLL, DSP, clock dividers power up
 	TAS2555_UDELAY, 2000,		//delay
+	TAS2555_POWER_CTRL1_REG, 0x78,	//toggle DSP 
+	TAS2555_UDELAY, 2000,		//delay 2ms
+	TAS2555_POWER_CTRL1_REG, 0xf8,
+	TAS2555_UDELAY, 2000,		//delay 2ms
+	TAS2555_CLK_ERR_CTRL1, 0x03,	//enable clock error detection on PLL
 	0xFFFFFFFF, 0xFFFFFFFF
 };
 
@@ -197,7 +203,6 @@ static int tas2555_dev_load_data(struct tas2555_priv *pTAS2555,
 		else if (nRegister != 0xFFFFFFFF) {
 			ret = pTAS2555->write(pTAS2555, nRegister, nData);
 			if(ret < 0) {
-				dev_err(pTAS2555->dev, "Reg Write err %d\n", ret);
 				break;
 			}
 		}
@@ -213,7 +218,6 @@ void failsafe(struct tas2555_priv *pTAS2555)
 	pTAS2555->mnErrorCode |= TAS2555_ERROR_FAILSAFE;
 	dev_dbg(pTAS2555->dev, "Enable: load shutdown sequence\n");
 	tas2555_dev_load_data(pTAS2555, p_tas2555_shutdown_data);
-	//tas2555_dev_load_data(pTAS2555, p_tas2555_shutdown_clk_err);
 	if (pTAS2555->mpFirmware != NULL)
 		tas2555_clear_firmware(pTAS2555->mpFirmware);
 	pTAS2555->mbPowerUp = false;
@@ -324,13 +328,11 @@ int tas2555_get_Re(struct tas2555_priv *pTAS2555, unsigned int *pRe)
 
 		ret = pTAS2555->read(pTAS2555, TAS2555_CHANNEL_CTRL_REG, &nValue);
 		if (ret < 0) {
-			dev_err(pTAS2555->dev, "I2C error\n");
 			goto err;
 		}
 
 		nValue = (nValue & 0x06) >> 1;
-		if (chkReDeltaBoundary(pTAS2555, 
-			pTAS2555->mnReOrignal, pTAS2555->mnReDelta, nRe, nValue, pRe))
+		if (chkReDeltaBoundary(pTAS2555, pTAS2555->mnReOrignal, pTAS2555->mnReDelta, nRe, nValue, pRe))
 			failsafe(pTAS2555);
 	} else {
 		*pRe = pTAS2555->mnReLastKnown;
@@ -402,26 +404,24 @@ int tas2555_load_platdata(struct tas2555_priv *pTAS2555)
 {
 	int nResult = 0;
 
-	nResult = tas2555_dev_load_data(pTAS2555, p_tas2555_default_data);
-	if (nResult < 0)
-		goto end;
-
 	if (gpio_is_valid(pTAS2555->mnGpioINT)) {
 		nResult = tas2555_configIRQ(pTAS2555);
 		if (nResult >= 0)
 			nResult = pTAS2555->enableIRQ(pTAS2555, false, true);
 	}
 
-end:
 	return nResult;
 }
 
 int tas2555_load_default(struct tas2555_priv *pTAS2555)
 {
-	int ret = 0;
+	int nResult = 0;
 
-	ret = tas2555_load_platdata(pTAS2555);
-	return ret;
+	nResult = tas2555_dev_load_data(pTAS2555, p_tas2555_default_data);
+	if (nResult >= 0)
+		nResult = tas2555_load_platdata(pTAS2555);
+
+	return nResult;
 }
 
 int tas2555_enable(struct tas2555_priv *pTAS2555, bool bEnable)
@@ -443,7 +443,6 @@ int tas2555_enable(struct tas2555_priv *pTAS2555, bool bEnable)
 			nResult = pTAS2555->read(pTAS2555, TAS2555_DSP_MODE_SELECT_REG, &nValue);
 			if (nResult < 0)
 				goto end;
-
 			if (pTAS2555->mnCurrentProgram == 0) {
 				/* smart-amp mode */
 				if ((nValue & 0x03) != 0) {
@@ -453,10 +452,18 @@ int tas2555_enable(struct tas2555_priv *pTAS2555, bool bEnable)
 				}
 			}
 
+			nResult = pTAS2555->read(pTAS2555, TAS2555_SAFE_GUARD_REG, &nValue);
+			if ((nValue & 0xff) != TAS2555_SAFE_GUARD_PATTERN) {
+					/* failed to pass safe guard check */
+					nResult = -1;
+					goto end;
+			}
+
 			if (!pTAS2555->mbCalibrationLoaded) {
 				tas2555_load_calibration(pTAS2555, TAS2555_CAL_NAME);
 				pTAS2555->mbCalibrationLoaded = true;
 			}
+
 			dev_dbg(pTAS2555->dev, "Enable: load startup sequence\n");
 			nResult = tas2555_dev_load_data(pTAS2555, p_tas2555_startup_data);
 			if (nResult < 0)
@@ -467,14 +474,16 @@ int tas2555_enable(struct tas2555_priv *pTAS2555, bool bEnable)
 				if (nResult < 0)
 					goto end;
 				if (pTAS2555->mbLoadConfigurationPostPowerUp) {
-					dev_dbg(pTAS2555->dev,	"Enable: load configuration: %s, %s\n", pConfiguration->mpName, pConfiguration->mpDescription);
+					dev_dbg(pTAS2555->dev, "Enable: load configuration: %s, %s\n",
+						pConfiguration->mpName, pConfiguration->mpDescription);
 					nResult = tas2555_load_data(pTAS2555, &(pConfiguration->mData), TAS2555_BLOCK_CONF_COEFF);
 					if (nResult < 0)
 						goto end;
 					pTAS2555->mbLoadConfigurationPostPowerUp = false;
 					if (pTAS2555->mpCalFirmware->mnCalibrations) {
 						dev_dbg(pTAS2555->dev, "Enable: load calibration\n");
-						nResult = tas2555_load_block(pTAS2555, &(pTAS2555->mpCalFirmware->mpCalibrations[pTAS2555->mnCurrentCalibration].mBlock));
+						nResult = tas2555_load_block(pTAS2555,
+									&(pTAS2555->mpCalFirmware->mpCalibrations[pTAS2555->mnCurrentCalibration].mBlock));
 						if (nResult < 0)
 							goto end;
 						nResult = tas2555_get_ReCoefficient(pTAS2555, &pTAS2555->mnReOrignal);
@@ -490,7 +499,8 @@ int tas2555_enable(struct tas2555_priv *pTAS2555, bool bEnable)
 					if (pTAS2555->mpCalFirmware->mnCalibrations) {
 						if (pTAS2555->mbLoadCalibrationPostPowerUp) {
 							dev_dbg(pTAS2555->dev, "Enable: load calibration\n");
-							nResult = tas2555_load_block(pTAS2555, &(pTAS2555->mpCalFirmware->mpCalibrations[pTAS2555->mnCurrentCalibration].mBlock));
+							nResult = tas2555_load_block(pTAS2555,
+								&(pTAS2555->mpCalFirmware->mpCalibrations[pTAS2555->mnCurrentCalibration].mBlock));
 							if (nResult < 0)
 								goto end;
 							nResult = tas2555_get_ReCoefficient(pTAS2555, &pTAS2555->mnReOrignal);
@@ -1503,8 +1513,11 @@ int tas2555_set_config(struct tas2555_priv *pTAS2555, int config)
 void tas2555_clear_firmware(struct TFirmware *pFirmware)
 {
 	unsigned int n, nn;
-	if (!pFirmware) return;
-	if (pFirmware->mpDescription) kfree(pFirmware->mpDescription);
+
+	if (!pFirmware)
+		return;
+	if (pFirmware->mpDescription)
+		kfree(pFirmware->mpDescription);
 
 	if (pFirmware->mnPLLs) {
 		for (n = 0; n < pFirmware->mnPLLs; n++) {
@@ -1739,14 +1752,12 @@ int tas2555_set_program(struct tas2555_priv *pTAS2555, unsigned int nProgram, in
 	if (nResult < 0) {
 		goto end;
 	}
+
+	msleep(1);
 	nResult = tas2555_load_default(pTAS2555);
 	if (nResult < 0)
 		goto end;
 
-	msleep(1);
-	pTAS2555->mnCurrentBook = 0;
-	pTAS2555->mnCurrentPage = 0;
-	
 	dev_info(pTAS2555->dev, "load program %d\n", nProgram);
 	nResult = tas2555_load_data(pTAS2555, &(pTAS2555->mpFirmware->mpPrograms[nProgram].mData), TAS2555_BLOCK_BASE_MAIN);
 	if (nResult < 0)
@@ -1864,12 +1875,10 @@ int tas2555_parse_dt(struct device *dev, struct tas2555_priv *pTAS2555)
 
 	if (ret >= 0) {
 		pTAS2555->mnGpioINT = of_get_named_gpio(np, "ti,irq-gpio", 0);
-		if (pTAS2555->mnGpioINT < 0) {
+		if (pTAS2555->mnGpioINT < 0)
 			dev_err(pTAS2555->dev, "Looking up %s property in node %s failed %d\n",
 				"ti,irq-gpio", np->full_name, pTAS2555->mnGpioINT);
-			ret = -EINVAL;
-			pTAS2555->mnErrorCode |= TAS2555_ERROR_INVALIDPARAM;
-		} else
+		else
 			dev_dbg(pTAS2555->dev, "ti,irq-gpio=%d\n", pTAS2555->mnGpioINT);
 	}
 

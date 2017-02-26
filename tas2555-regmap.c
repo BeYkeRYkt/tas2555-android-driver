@@ -450,9 +450,6 @@ static int tas2555_i2c_probe(struct i2c_client *pClient,
 	if (!pTAS2555->mpCalFirmware)
 		return -ENOMEM;
 
-	pTAS2555->mnCurrentPage = 0;
-	pTAS2555->mnCurrentBook = 0;
-
 	if (gpio_is_valid(pTAS2555->mnGpioINT)) {
 		nResult = gpio_request(pTAS2555->mnGpioINT, "TAS2555-IRQ");
 		if (nResult < 0) {
@@ -517,7 +514,7 @@ static int tas2555_i2c_remove(struct i2c_client *pClient)
 	tas2555_deregister_misc(pTAS2555);
 	mutex_destroy(&pTAS2555->file_lock);
 #endif
-	
+
 	return 0;
 }
 

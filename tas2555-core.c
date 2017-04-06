@@ -106,7 +106,7 @@ static unsigned int p_tas2555_startup_data[] = {
 	TAS2555_UDELAY, 2000,		//delay 2ms
 	TAS2555_POWER_CTRL1_REG, 0xf8,
 	TAS2555_UDELAY, 2000,		//delay 2ms
-	TAS2555_CLK_ERR_CTRL1, 0x03,	//enable clock error detection on PLL
+	TAS2555_CLK_ERR_CTRL1, 0x0b,	//enable clock error detection on PLL
 	0xFFFFFFFF, 0xFFFFFFFF
 };
 
@@ -440,23 +440,11 @@ int tas2555_enable(struct tas2555_priv *pTAS2555, bool bEnable)
 
 	if (bEnable) {
 		if (!pTAS2555->mbPowerUp) {
-			nResult = pTAS2555->read(pTAS2555, TAS2555_DSP_MODE_SELECT_REG, &nValue);
-			if (nResult < 0)
-				goto end;
-			if (pTAS2555->mnCurrentProgram == 0) {
-				/* smart-amp mode */
-				if ((nValue & 0x03) != 0) {
-					/* unexpected error happens */
-					nResult = -1;
-					goto end;
-				}
-			}
-
 			nResult = pTAS2555->read(pTAS2555, TAS2555_SAFE_GUARD_REG, &nValue);
 			if ((nValue & 0xff) != TAS2555_SAFE_GUARD_PATTERN) {
-					/* failed to pass safe guard check */
-					nResult = -1;
-					goto end;
+				/* failed to pass safe guard check */
+				nResult = -1;
+				goto end;
 			}
 
 			if (!pTAS2555->mbCalibrationLoaded) {

@@ -1267,6 +1267,16 @@ check:
 			goto start;
 	}
 
+	if ((nResult >= 0)
+		&& (pBlock->mnType == TAS2555_BLOCK_PLL)) {
+		nResult = pTAS2555->read(pTAS2555, TAS2555_PLL_CLKIN_REG, &nValue);
+		if(nResult < 0) {
+			goto end;
+		}
+		dev_info(pTAS2555->dev, "TAS2555 PLL_CLKIN = 0x%02X\n", nValue);
+		p_tas2555_startup_data[TAS2555_STARTUP_DATA_PLL_CLKIN_INDEX] = nValue;
+	}
+
 end:
 	if (nResult < 0) {
 		dev_err(pTAS2555->dev, "Block (%d) load error\n",
@@ -1675,7 +1685,6 @@ int tas2555_set_program(struct tas2555_priv *pTAS2555, unsigned int nProgram, in
 	struct TConfiguration *pConfiguration;
 	unsigned int nConfiguration = 0;
 	unsigned int nSampleRate = 0;
-	unsigned int Value = 0;
 	bool bFound = false;
 	int nResult = -1;
 
@@ -1767,12 +1776,6 @@ int tas2555_set_program(struct tas2555_priv *pTAS2555, unsigned int nProgram, in
 	nResult = tas2555_load_data(pTAS2555, &(pConfiguration->mData), TAS2555_BLOCK_CONF_PRE);
 	if(nResult < 0)
 		goto end;
-	nResult = pTAS2555->read(pTAS2555, TAS2555_PLL_CLKIN_REG, &Value);
-	if(nResult < 0) {
-		goto end;
-	}
-	dev_info(pTAS2555->dev, "TAS2555 PLL_CLKIN = 0x%02X\n", Value);
-	p_tas2555_startup_data[TAS2555_STARTUP_DATA_PLL_CLKIN_INDEX] = Value;
 
 	if (pTAS2555->mbPowerUp){
 		dev_dbg(pTAS2555->dev, "device powered up, load startup\n");

@@ -463,7 +463,7 @@ static int tas2555_i2c_probe(struct i2c_client *pClient,
 		pTAS2555->mnIRQ = gpio_to_irq(pTAS2555->mnGpioINT);
 		dev_dbg(pTAS2555->dev, "irq = %d\n", pTAS2555->mnIRQ);
 		nResult = request_threaded_irq(pTAS2555->mnIRQ, tas2555_irq_handler,
-				NULL, IRQF_TRIGGER_RISING | IRQF_ONESHOT,
+				NULL, IRQF_TRIGGER_HIGH | IRQF_ONESHOT,
 				pClient->name, pTAS2555);
 		if (nResult < 0) {
 			dev_err(pTAS2555->dev,
